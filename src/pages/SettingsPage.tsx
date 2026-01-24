@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { resolveLanguage, type LanguageSetting } from '@electron/shared/i18n'
@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation()
@@ -223,167 +224,186 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-xl">
+    <div className="max-w-2xl">
       <h1 className="text-2xl font-bold text-foreground mb-6">{t('settings.title')}</h1>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>{t('settings.about')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">
-                {t('settings.version', { version: __APP_VERSION__ })}
-              </p>
-              {updateInfo?.hasUpdate && (
-                <p className="text-sm text-chart-2 font-medium">
-                  {t('settings.hasUpdate', { version: updateInfo.latestVersion })}
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="general">{t('settings.appPreferences')}</TabsTrigger>
+          <TabsTrigger value="asr">{t('settings.asrConfig')}</TabsTrigger>
+          <TabsTrigger value="hotkeys">{t('hotkey.title')}</TabsTrigger>
+          <TabsTrigger value="about">{t('settings.about')}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('settings.appPreferences')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="appLanguage">{t('settings.appLanguage')}</Label>
+                <Select value={config.app.language} onValueChange={handleAppLanguageChange}>
+                  <SelectTrigger id="appLanguage" className="no-drag w-full cursor-pointer">
+                    <SelectValue placeholder={t('settings.languagePlaceholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="system">{t('settings.systemLanguage')}</SelectItem>
+                    <SelectItem value="zh">{t('settings.languageChinese')}</SelectItem>
+                    <SelectItem value="en">{t('settings.languageEnglish')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center justify-between space-x-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="autoLaunch">{t('settings.autoLaunch')}</Label>
+                  <p className="text-sm text-muted-foreground">{t('settings.autoLaunchHelp')}</p>
+                </div>
+                <Switch
+                  id="autoLaunch"
+                  checked={config.app.autoLaunch ?? false}
+                  onCheckedChange={(checked) =>
+                    setConfig({
+                      ...config,
+                      app: { ...config.app, autoLaunch: checked },
+                    })
+                  }
+                  className="no-drag cursor-pointer"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="asr" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('settings.asrConfig')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="region">{t('settings.region')}</Label>
+                <Select value={currentRegion} onValueChange={handleRegionChange}>
+                  <SelectTrigger id="region" className="no-drag w-full cursor-pointer">
+                    <SelectValue placeholder={t('settings.languagePlaceholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cn">{t('settings.regionChina')}</SelectItem>
+                    <SelectItem value="intl">{t('settings.regionIntl')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="apiKey">
+                  {t('settings.apiKey')} <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="apiKey"
+                  type="password"
+                  value={currentApiKey}
+                  onChange={(e) => handleApiKeyChange(e.target.value)}
+                  placeholder={t('settings.apiKeyPlaceholder')}
+                  className="no-drag"
+                />
+                <p className="text-sm text-muted-foreground mr-1">
+                  {t('settings.apiKeyHelp')}{' '}
+                  <a
+                    href={
+                      currentRegion === 'intl'
+                        ? 'https://z.ai/manage-apikey/apikey-list'
+                        : 'https://bigmodel.cn/usercenter/proj-mgmt/apikeys'
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {currentRegion === 'intl' ? 'z.ai' : 'bigmodel.cn'}
+                  </a>
                 </p>
-              )}
-              {updateInfo?.hasUpdate === false && !updateInfo.error && (
-                <p className="text-sm text-muted-foreground">{t('settings.noUpdate')}</p>
-              )}
-              {updateInfo?.error && (
-                <p className="text-sm text-destructive">{t('settings.updateError')}</p>
-              )}
-            </div>
-            <div className="flex gap-2">
-              {updateInfo?.hasUpdate ? (
-                <Button size="sm" onClick={handleOpenRelease} className="cursor-pointer no-drag">
-                  {t('settings.downloadUpdate')}
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCheckUpdate}
-                  disabled={checkingUpdate}
-                  className="cursor-pointer no-drag"
-                >
-                  {checkingUpdate ? t('settings.checkingUpdate') : t('settings.checkUpdate')}
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              </div>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>{t('settings.appPreferences')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="appLanguage">{t('settings.appLanguage')}</Label>
-            <Select value={config.app.language} onValueChange={handleAppLanguageChange}>
-              <SelectTrigger id="appLanguage" className="no-drag w-full cursor-pointer">
-                <SelectValue placeholder={t('settings.languagePlaceholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="system">{t('settings.systemLanguage')}</SelectItem>
-                <SelectItem value="zh">{t('settings.languageChinese')}</SelectItem>
-                <SelectItem value="en">{t('settings.languageEnglish')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="endpoint">{t('settings.apiEndpoint')}</Label>
+                <Input
+                  id="endpoint"
+                  type="text"
+                  value={
+                    config.asr.endpoint ||
+                    (currentRegion === 'intl'
+                      ? 'https://api.z.ai/api/paas/v4/audio/transcriptions'
+                      : 'https://open.bigmodel.cn/api/paas/v4/audio/transcriptions')
+                  }
+                  readOnly
+                  disabled
+                  className="no-drag bg-muted text-muted-foreground"
+                />
+                <div className="flex items-center space-x-2 mt-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  <p className="text-sm text-muted-foreground">{t('settings.durationWarning')}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <div className="flex items-center justify-between space-x-2">
-            <div className="space-y-0.5">
-              <Label htmlFor="autoLaunch">{t('settings.autoLaunch')}</Label>
-              <p className="text-sm text-muted-foreground">{t('settings.autoLaunchHelp')}</p>
-            </div>
-            <Switch
-              id="autoLaunch"
-              checked={config.app.autoLaunch ?? false}
-              onCheckedChange={(checked) =>
-                setConfig({
-                  ...config,
-                  app: { ...config.app, autoLaunch: checked },
-                })
-              }
-              className="no-drag cursor-pointer"
-            />
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="hotkeys" className="space-y-6">
+          <HotkeySettings />
+        </TabsContent>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>{t('settings.asrConfig')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="region">{t('settings.region')}</Label>
-            <Select value={currentRegion} onValueChange={handleRegionChange}>
-              <SelectTrigger id="region" className="no-drag w-full cursor-pointer">
-                <SelectValue placeholder={t('settings.languagePlaceholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cn">{t('settings.regionChina')}</SelectItem>
-                <SelectItem value="intl">{t('settings.regionIntl')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="apiKey">
-              {t('settings.apiKey')} <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="apiKey"
-              type="password"
-              value={currentApiKey}
-              onChange={(e) => handleApiKeyChange(e.target.value)}
-              placeholder={t('settings.apiKeyPlaceholder')}
-              className="no-drag"
-            />
-            <p className="text-sm text-muted-foreground mr-1">
-              {t('settings.apiKeyHelp')}{' '}
-              <a
-                href={
-                  currentRegion === 'intl'
-                    ? 'https://z.ai/manage-apikey/apikey-list'
-                    : 'https://bigmodel.cn/usercenter/proj-mgmt/apikeys'
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                {currentRegion === 'intl' ? 'z.ai' : 'bigmodel.cn'}
-              </a>
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="endpoint">{t('settings.apiEndpoint')}</Label>
-            <Input
-              id="endpoint"
-              type="text"
-              value={
-                config.asr.endpoint ||
-                (currentRegion === 'intl'
-                  ? 'https://api.z.ai/api/paas/v4/audio/transcriptions'
-                  : 'https://open.bigmodel.cn/api/paas/v4/audio/transcriptions')
-              }
-              readOnly
-              disabled
-              className="no-drag bg-muted text-muted-foreground"
-            />
-            <div className="flex items-center space-x-2 mt-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              <p className="text-sm text-muted-foreground">{t('settings.durationWarning')}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="mb-6">
-        <HotkeySettings />
-      </div>
+        <TabsContent value="about" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('settings.about')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    {t('settings.version', { version: __APP_VERSION__ })}
+                  </p>
+                  {updateInfo?.hasUpdate && (
+                    <p className="text-sm text-chart-2 font-medium">
+                      {t('settings.hasUpdate', { version: updateInfo.latestVersion })}
+                    </p>
+                  )}
+                  {updateInfo?.hasUpdate === false && !updateInfo.error && (
+                    <p className="text-sm text-muted-foreground">{t('settings.noUpdate')}</p>
+                  )}
+                  {updateInfo?.error && (
+                    <p className="text-sm text-destructive">{t('settings.updateError')}</p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {updateInfo?.hasUpdate ? (
+                    <Button
+                      size="sm"
+                      onClick={handleOpenRelease}
+                      className="cursor-pointer no-drag"
+                    >
+                      {t('settings.downloadUpdate')}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCheckUpdate}
+                      disabled={checkingUpdate}
+                      className="cursor-pointer no-drag"
+                    >
+                      {checkingUpdate ? t('settings.checkingUpdate') : t('settings.checkUpdate')}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {testResult && (
-        <Alert variant={isSuccess ? 'default' : 'destructive'} className="mb-6">
+        <Alert variant={isSuccess ? 'default' : 'destructive'} className="mt-6">
           {isSuccess ? (
             <CheckCircle2 className="h-4 w-4 text-chart-2" />
           ) : (
@@ -395,7 +415,7 @@ export default function SettingsPage() {
         </Alert>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 mt-6">
         <Button
           variant="secondary"
           onClick={handleTestConnection}

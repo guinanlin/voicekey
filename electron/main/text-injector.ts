@@ -32,7 +32,7 @@ export class TextInjector {
 
       const typingStartTime = Date.now()
       console.log(`[TextInjector] [${new Date().toISOString()}] Starting text injection...`)
-      await this.typeText(text)
+      await this.typeTextInternal(text)
       const typingDuration = Date.now() - typingStartTime
       console.log(`[TextInjector] [${new Date().toISOString()}] Text injection completed`)
       console.log(`[TextInjector] ⏱️  Keyboard typing took ${typingDuration}ms`)
@@ -83,11 +83,26 @@ export class TextInjector {
     }
   }
 
-  private async typeText(text: string): Promise<void> {
-    if (process.platform === 'win32') {
+  /** 内部实现：实际执行键盘输入/剪贴板粘贴 */
+  private async typeTextInternal(text: string): Promise<void> {
+    // 检查是否包含非ASCII字符（如中文）
+    const hasNonAscii = text.split('').some((char) => char.charCodeAt(0) > 127)
+
+    if (process.platform === 'win32' || hasNonAscii) {
+      // Windows平台或包含非ASCII字符时使用剪贴板方式
+      console.log(
+        '[TextInjector] Using clipboard method for text injection (platform:',
+        process.platform,
+        ', hasNonAscii:',
+        hasNonAscii,
+        ')',
+      )
       await this.pasteFromClipboard(text)
       return
     }
+
+    // 其他平台且纯ASCII文本使用键盘输入
+    console.log('[TextInjector] Using keyboard typing for ASCII text')
     await keyboard.type(text)
   }
 
@@ -153,6 +168,247 @@ export class TextInjector {
   // 延迟函数
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
+  // 字符串到 Key 映射
+  private stringToKey(keyName: string): Key | Key[] | null {
+    const lower = keyName.toLowerCase().trim()
+
+    // 组合键
+    if (lower === 'ctrl_enter') {
+      return [Key.LeftControl, Key.Enter]
+    }
+
+    // 基础按键映射
+    const keyMap: Record<string, Key> = {
+      enter: Key.Enter,
+      tab: Key.Tab,
+      backspace: Key.Backspace,
+      esc: Key.Escape,
+      escape: Key.Escape,
+      space: Key.Space,
+      up: Key.Up,
+      down: Key.Down,
+      left: Key.Left,
+      right: Key.Right,
+      home: Key.Home,
+      end: Key.End,
+      pageup: Key.PageUp,
+      pagedown: Key.PageDown,
+      delete: Key.Delete,
+      insert: Key.Insert,
+    }
+
+    return keyMap[lower] || null
+  }
+
+  // 文本输入（支持模式和后置按键）
+  async typeText(
+    text: string,
+    mode: 'type' | 'clipboard' = 'type',
+    afterKey?: string,
+  ): Promise<{ success: boolean; message?: string; error?: string; code?: string }> {
+    // 参数验证
+    if (mode === 'type' && (!text || !text.trim())) {
+      return {
+        success: false,
+        error: '文本内容不能为空',
+        code: 'INVALID_PARAMETER',
+      }
+    }
+
+    if (mode !== 'type' && mode !== 'clipboard') {
+      return {
+        success: false,
+        error: `无效的输入模式: ${mode}`,
+        code: 'INVALID_PARAMETER',
+      }
+    }
+
+    try {
+      if (mode === 'clipboard') {
+        // 仅同步到剪贴板
+        clipboard.writeText(text)
+        return {
+          success: true,
+          message: '文本已复制到剪贴板',
+        }
+      }
+
+      // type 模式：需要权限检查
+      const permission = await this.checkPermissions()
+      if (!permission.hasPermission) {
+        return {
+          success: false,
+          error: permission.message || '需要权限才能模拟键盘输入',
+          code: 'PERMISSION_DENIED',
+        }
+      }
+
+      // 执行文本输入
+      await this.injectText(text)
+
+      // 如果有后置按键，执行按键操作
+      if (afterKey) {
+        const key = this.stringToKey(afterKey)
+        if (key) {
+          await this.delay(50) // 等待输入完成
+          if (Array.isArray(key)) {
+            await keyboard.pressKey(...key)
+            await keyboard.releaseKey(...key)
+          } else {
+            await this.pressKey(key)
+          }
+        } else {
+          console.warn(`[TextInjector] Unknown afterKey: ${afterKey}`)
+        }
+      }
+
+      return {
+        success: true,
+        message: '文本输入成功',
+      }
+    } catch (error) {
+      console.error('[TextInjector] typeText failed:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '操作失败',
+        code: 'SYSTEM_ERROR',
+      }
+    }
+  }
+
+  // 按键模拟（字符串版本）
+  async pressKeyFromString(
+    keyName: string,
+  ): Promise<{ success: boolean; message?: string; error?: string; code?: string }> {
+    if (!keyName || !keyName.trim()) {
+      return {
+        success: false,
+        error: '按键名称不能为空',
+        code: 'INVALID_PARAMETER',
+      }
+    }
+
+    // 检查权限
+    const permission = await this.checkPermissions()
+    if (!permission.hasPermission) {
+      return {
+        success: false,
+        error: permission.message || '需要权限才能模拟键盘输入',
+        code: 'PERMISSION_DENIED',
+      }
+    }
+
+    try {
+      const key = this.stringToKey(keyName)
+      if (!key) {
+        return {
+          success: false,
+          error: `不支持的按键: ${keyName}`,
+          code: 'INVALID_PARAMETER',
+        }
+      }
+
+      if (Array.isArray(key)) {
+        await keyboard.pressKey(...key)
+        await keyboard.releaseKey(...key)
+      } else {
+        await this.pressKey(key)
+      }
+
+      return {
+        success: true,
+        message: `按键 ${keyName} 模拟成功`,
+      }
+    } catch (error) {
+      console.error('[TextInjector] pressKeyFromString failed:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '操作失败',
+        code: 'SYSTEM_ERROR',
+      }
+    }
+  }
+
+  // 服务状态
+  getStatus(): {
+    status: 'ready' | 'warning' | 'error' | 'disabled'
+    message: string
+    permission: boolean
+  } {
+    // 检查平台支持
+    const platformSupported = ['win32', 'darwin', 'linux'].includes(process.platform)
+
+    if (!platformSupported) {
+      return {
+        status: 'error',
+        message: `当前系统不支持剪贴板功能: ${process.platform}`,
+        permission: false,
+      }
+    }
+
+    // 检查依赖可用性（nut-js）
+    let dependenciesAvailable = false
+    try {
+      // 尝试访问 keyboard 对象，如果成功则依赖可用
+      dependenciesAvailable = keyboard !== undefined
+    } catch {
+      dependenciesAvailable = false
+    }
+
+    if (!dependenciesAvailable) {
+      return {
+        status: 'error',
+        message: '缺少必要的依赖库: @nut-tree-fork/nut-js',
+        permission: false,
+      }
+    }
+
+    // 检查权限（异步检查，这里返回警告状态）
+    // 实际权限检查在 checkPermissionsExtended 中
+    return {
+      status: 'ready',
+      message: '剪贴板服务就绪',
+      permission: true, // 这里假设有权限，实际权限在 checkPermissionsExtended 中检查
+    }
+  }
+
+  // 扩展权限检查
+  async checkPermissionsExtended(): Promise<{
+    has_permission: boolean
+    platform_supported: boolean
+    dependencies_available: boolean
+    message: string
+  }> {
+    const platformSupported = ['win32', 'darwin', 'linux'].includes(process.platform)
+
+    let dependenciesAvailable = false
+    try {
+      dependenciesAvailable = keyboard !== undefined
+    } catch {
+      dependenciesAvailable = false
+    }
+
+    const permission = await this.checkPermissions()
+
+    let message = ''
+    if (!platformSupported) {
+      message = `当前系统不支持: ${process.platform}`
+    } else if (!dependenciesAvailable) {
+      message = '缺少必要的依赖库: @nut-tree-fork/nut-js'
+    } else if (permission.hasPermission) {
+      message = '权限正常'
+    } else {
+      message = permission.message || '需要权限才能使用键盘模拟功能'
+    }
+
+    return {
+      has_permission: permission.hasPermission,
+      platform_supported: platformSupported,
+      dependencies_available: dependenciesAvailable,
+      message,
+    }
   }
 }
 

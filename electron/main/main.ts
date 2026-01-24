@@ -1,4 +1,4 @@
-﻿import {
+import {
   app,
   BrowserWindow,
   ipcMain,
@@ -9,6 +9,11 @@
   screen,
 } from 'electron'
 import fs from 'fs'
+
+// 抑制 GPU 初始化失败报错（常见于 Linux/VM/远程桌面）
+// 若本机 GPU 正常且无报错，可注释掉以下两行
+app.commandLine.appendSwitch('disable-gpu')
+app.commandLine.appendSwitch('disable-gpu-sandbox')
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -21,6 +26,7 @@ import { initMainI18n, setMainLanguage, t } from './i18n'
 import { ioHookManager } from './iohook-manager'
 import { textInjector } from './text-injector'
 import { UpdaterManager } from './updater-manager'
+import { startHttpServer, stopHttpServer } from './http-server'
 import { IPC_CHANNELS, OverlayState, VoiceSession } from '../shared/types'
 // ES Module compatibility - 延迟导入 fluent-ffmpeg 避免启动时的 __dirname 错误
 let ffmpeg: any
@@ -843,6 +849,13 @@ app.whenReady().then(async () => {
   registerGlobalHotkeys()
   ioHookManager.start()
 
+  // 启动 HTTP 服务器（监听 0.0.0.0，允许局域网访问）
+  try {
+    await startHttpServer(4321, '0.0.0.0')
+  } catch (error) {
+    console.error('[Main] HTTP 服务器启动失败:', error)
+  }
+
   // 设置 Dock 图标和应用名称（macOS）
   if (process.platform === 'darwin') {
     app.setName(t('app.name'))
@@ -870,10 +883,11 @@ app.on('window-all-closed', () => {
   // 用户需要从托盘退出
 })
 
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
   // 清理资源
   hotkeyManager.unregisterAll()
   ioHookManager.stop()
+  await stopHttpServer()
 })
 
 app.on('activate', () => {
