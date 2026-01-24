@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.1.6 (2026-01-24)
+
+### Features
+
+- init commit ([4a9f11a](https://github.com/guinanlin/voicekey/commit/4a9f11a903fb65682909cd18f2f4467a43fa07db))
+- **settings:** refactor settings page to tab layout ([2ab438e](https://github.com/guinanlin/voicekey/commit/2ab438ec6fff23ca22e810555b21407159cf80b2))
+- **update-check:** add startup update check ([d240577](https://github.com/guinanlin/voicekey/commit/d2405771e3947ea6771ca4f5ea9c784f9d013d32))
+
+### Bug Fixes
+
+- 修复 text-injector.ts 文件格式问题 ([c7722de](https://github.com/guinanlin/voicekey/commit/c7722de92d8f1b47f6047f296db81920e7eb18d1))
+
 ### [0.1.5](https://github.com/BuildWithAIs/voicekey/compare/v0.1.4...v0.1.5) (2026-01-22)
 
 ### [0.1.4](https://github.com/BuildWithAIs/voicekey/compare/v0.1.3...v0.1.4) (2026-01-22)
