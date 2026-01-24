@@ -48,8 +48,8 @@ jobs:
           # 运行 standard-version 更新版本和 Changelog
           npx standard-version --release-as ${{ inputs.release_type }}
 
-          # 推送 commits 和 tags 到 main
-          git push --follow-tags origin HEAD:main
+          # 推送 commits 和 tags 到当前分支
+          git push --follow-tags origin HEAD:${{ github.ref_name }}
 
       - name: Get new tag
         id: get_tag
