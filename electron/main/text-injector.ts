@@ -85,24 +85,10 @@ export class TextInjector {
 
   /** 内部实现：实际执行键盘输入/剪贴板粘贴 */
   private async typeTextInternal(text: string): Promise<void> {
-    // 检查是否包含非ASCII字符（如中文）
-    const hasNonAscii = text.split('').some((char) => char.charCodeAt(0) > 127)
-
-    if (process.platform === 'win32' || hasNonAscii) {
-      // Windows平台或包含非ASCII字符时使用剪贴板方式
-      console.log(
-        '[TextInjector] Using clipboard method for text injection (platform:',
-        process.platform,
-        ', hasNonAscii:',
-        hasNonAscii,
-        ')',
-      )
+    if (process.platform === 'win32') {
       await this.pasteFromClipboard(text)
       return
     }
-
-    // 其他平台且纯ASCII文本使用键盘输入
-    console.log('[TextInjector] Using keyboard typing for ASCII text')
     await keyboard.type(text)
   }
 
