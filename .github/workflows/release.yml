@@ -52,7 +52,8 @@ jobs:
           npm ci
 
           # 获取最新的 tag 版本（如果存在）
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          # 使用 git tag 命令获取最新 tag，按版本号排序
+          LATEST_TAG=$(git tag --sort=-version:refname 2>/dev/null | head -1 || echo "")
           CURRENT_VERSION=$(node -p "require('./package.json').version")
 
           echo "Latest tag: $LATEST_TAG"
