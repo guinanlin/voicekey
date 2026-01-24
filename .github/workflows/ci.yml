@@ -3,11 +3,13 @@ name: CI Quality Gate
 on:
   push:
     branches:
+      - dty
       - main
       - develop
   pull_request:
     branches:
       - main
+      - dty
       - develop
 
 jobs:
