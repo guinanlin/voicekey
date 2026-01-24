@@ -42,11 +42,75 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Fetch all tags
+        run: |
+          # 获取所有远程 tags，确保 standard-version 能识别最新版本
+          git fetch --tags --force
+
       - name: Bump version and push
         run: |
           npm ci
-          # 运行 standard-version 更新版本和 Changelog
-          npx standard-version --release-as ${{ inputs.release_type }}
+
+          # 获取最新的 tag 版本（如果存在）
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+
+          echo "Latest tag: $LATEST_TAG"
+          echo "Current package.json version: $CURRENT_VERSION"
+
+          # 如果存在最新 tag，先同步 package.json 版本到最新 tag 版本
+          if [ -n "$LATEST_TAG" ]; then
+            LATEST_VERSION=${LATEST_TAG#v}
+            echo "Latest tag version: $LATEST_VERSION"
+            
+            # 比较版本号，如果当前版本低于最新 tag 版本，则更新
+            VERSION_COMPARE=$(node -e "
+              const semver = require('semver');
+              const current = '$CURRENT_VERSION';
+              const latest = '$LATEST_VERSION';
+              console.log(semver.lt(current, latest) ? 'true' : 'false');
+            " 2>/dev/null || echo "false")
+            
+            if [ "$VERSION_COMPARE" = "true" ]; then
+              echo "Updating package.json version from $CURRENT_VERSION to $LATEST_VERSION"
+              npm version "$LATEST_VERSION" --no-git-tag-version
+              if ! git diff --quiet package.json package-lock.json; then
+                git add package.json package-lock.json
+                git commit -m "chore: sync version to $LATEST_VERSION" || true
+              fi
+            fi
+          fi
+
+          # 计算将要创建的新 tag
+          EXPECTED_TAG=$(node -e "
+            const semver = require('semver');
+            const current = require('./package.json').version;
+            const type = '${{ inputs.release_type }}';
+            let next;
+            if (type === 'major') next = semver.inc(current, 'major');
+            else if (type === 'minor') next = semver.inc(current, 'minor');
+            else next = semver.inc(current, 'patch');
+            console.log('v' + next);
+          ")
+          echo "Expected new tag: $EXPECTED_TAG"
+
+          # 检查 tag 是否已存在（本地或远程）
+          TAG_EXISTS=false
+          if git rev-parse "$EXPECTED_TAG" >/dev/null 2>&1; then
+            TAG_EXISTS=true
+            echo "Tag $EXPECTED_TAG already exists locally"
+          elif git ls-remote --tags origin "$EXPECTED_TAG" | grep -q "$EXPECTED_TAG"; then
+            TAG_EXISTS=true
+            echo "Tag $EXPECTED_TAG already exists on remote"
+          fi
+
+          if [ "$TAG_EXISTS" = "true" ]; then
+            echo "Tag $EXPECTED_TAG already exists, skipping standard-version"
+            echo "Using existing tag: $EXPECTED_TAG"
+          else
+            # 运行 standard-version 更新版本和 Changelog
+            npx standard-version --release-as ${{ inputs.release_type }}
+          fi
 
           # 推送 commits 和 tags 到当前分支
           git push --follow-tags origin HEAD:${{ github.ref_name }}
