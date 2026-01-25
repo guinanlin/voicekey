@@ -83,9 +83,16 @@ export class TextInjector {
     }
   }
 
-  /** 内部实现：实际执行键盘输入/剪贴板粘贴 */
+  /**
+   * 内部实现：实际执行键盘输入/剪贴板粘贴
+   *
+   * Windows/Linux：使用剪贴板粘贴 (Ctrl+V)。
+   * - keyboard.type() 模拟原始按键，不经过 IME，中文等 Unicode 会乱码。
+   * - 剪贴板写入 UTF-8 文本再粘贴，可正确注入多语言内容。
+   * macOS：沿用 keyboard.type()（若遇中文乱码可后续改为剪贴板）。
+   */
   private async typeTextInternal(text: string): Promise<void> {
-    if (process.platform === 'win32') {
+    if (process.platform === 'win32' || process.platform === 'linux') {
       await this.pasteFromClipboard(text)
       return
     }
