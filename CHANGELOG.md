@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.9](https://github.com/guinanlin/voicekey/compare/v0.2.8...v0.2.9) (2026-01-25)
+
+### Bug Fixes
+
+- **build:** move dmg config to top-level in electron-builder ([4eec591](https://github.com/guinanlin/voicekey/commit/4eec591b7362fd58bd7e7462a3d170c415c59943))
+
 ### [0.2.8](https://github.com/guinanlin/voicekey/compare/v0.2.7...v0.2.8) (2026-01-25)
 
 ### [0.2.7](https://github.com/guinanlin/voicekey/compare/v0.2.6...v0.2.7) (2026-01-25)
