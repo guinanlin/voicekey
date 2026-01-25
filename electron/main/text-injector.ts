@@ -148,6 +148,15 @@ export class TextInjector {
   private async pasteFromClipboard(text: string): Promise<void> {
     const snapshot = this.captureClipboard()
     try {
+      // 写入剪贴板：Electron 的 clipboard.writeText() 自动处理 UTF-8 编码
+      // 在 Windows 上添加调试日志，确认文本编码正确
+      if (process.platform === 'win32') {
+        console.log('[TextInjector] Writing to clipboard (Windows):', {
+          textLength: text.length,
+          firstChars: text.substring(0, 20),
+          textBytes: Buffer.from(text, 'utf8').toString('hex').substring(0, 40),
+        })
+      }
       clipboard.writeText(text)
       await this.delay(50)
       await keyboard.pressKey(Key.LeftControl, Key.V)
