@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.7](https://github.com/guinanlin/voicekey/compare/v0.2.6...v0.2.7) (2026-01-25)
+
+### Bug Fixes
+
+- **ci:** resolve macOS DMG build resource busy error ([75297b1](https://github.com/guinanlin/voicekey/commit/75297b105ea26d87d5f4e912c26a9e2b1f5679a9))
+
 ### [0.2.6](https://github.com/guinanlin/voicekey/compare/v0.2.5...v0.2.6) (2026-01-25)
 
 ### Features
