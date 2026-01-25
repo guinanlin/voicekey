@@ -29,6 +29,10 @@
     hardenedRuntime: true,
     gatekeeperAssess: false,
     icon: 'build/icons/mac/icon.icns',
+    dmg: {
+      // 增加重试次数和延迟，帮助处理资源占用问题
+      writeUpdateInfo: false,
+    },
   },
   win: {
     target: [
