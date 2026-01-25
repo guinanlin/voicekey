@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, CheckCheck, Mic, Sparkles, X, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { OverlayState, OverlayStatus } from '../../electron/shared/types'
@@ -13,6 +13,10 @@ export function HUD() {
   // 模拟波形数据 (结合真实的 audioLevel)
   const [waveform, setWaveform] = useState<number[]>([])
   const audioLevelRef = useRef(0)
+
+  // 录音时长（秒数）
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const recordingStartTimeRef = useRef<number | null>(null)
 
   useEffect(() => {
     document.documentElement.classList.add('overlay-html')
@@ -54,6 +58,39 @@ export function HUD() {
         })
       }, 80)
       return () => clearInterval(interval)
+    }
+  }, [status])
+
+  // 录音时长计时器
+  useEffect(() => {
+    if (status === 'recording') {
+      // 记录开始时间
+      recordingStartTimeRef.current = Date.now()
+      // 延迟重置秒数，避免在 effect 中直接调用 setState
+      const resetTimer = setTimeout(() => {
+        setElapsedSeconds(0)
+      }, 0)
+
+      const timer = setInterval(() => {
+        if (recordingStartTimeRef.current) {
+          const elapsed = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000)
+          const seconds = Math.min(elapsed, 999)
+          setElapsedSeconds(seconds)
+        }
+      }, 1000)
+
+      return () => {
+        clearTimeout(resetTimer)
+        clearInterval(timer)
+        recordingStartTimeRef.current = null
+      }
+    } else {
+      // 非录音状态时重置
+      recordingStartTimeRef.current = null
+      const resetTimer = setTimeout(() => {
+        setElapsedSeconds(0)
+      }, 0)
+      return () => clearTimeout(resetTimer)
     }
   }, [status])
 
@@ -115,7 +152,7 @@ export function HUD() {
         <div className="flex-1 flex flex-col justify-center min-h-[32px] overflow-hidden pr-2">
           {/* 1. Recording State */}
           {status === 'recording' && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
               {/* Dynamic Waveform Visualizer */}
               <div className="flex items-center gap-[2px] h-4">
                 {waveform.map((h, i) => (
@@ -130,8 +167,15 @@ export function HUD() {
                 {waveform.length === 0 && <div className="text-[10px] text-neutral-500">...</div>}
               </div>
 
+              {/* Recording Duration - 秒数显示 */}
+              <div className="flex items-center border-l border-white/10 pl-1">
+                <span className="text-xs font-mono font-medium text-white/90 tabular-nums">
+                  {String(elapsedSeconds).padStart(3, '0')}
+                </span>
+              </div>
+
               {/* Action Buttons */}
-              <div className="flex items-center gap-0.5 border-l border-white/10 pl-2">
+              <div className="flex items-center gap-0.5 border-l border-white/10 pl-1.5">
                 <button
                   onClick={handleConfirm}
                   className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/10 text-neutral-400 hover:text-white transition-colors"
