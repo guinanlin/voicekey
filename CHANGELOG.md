@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.2](https://github.com/guinanlin/voicekey/compare/v0.2.1...v0.2.2) (2026-01-25)
+
+### Features
+
+- **http-server:** add /clipboard/info endpoint for health check ([80624e5](https://github.com/guinanlin/voicekey/commit/80624e58acadc0891f80449863fa692e38dc8590))
+
+### Bug Fixes
+
+- **http-server:** remove unused request parameter in /info endpoint ([8d3a275](https://github.com/guinanlin/voicekey/commit/8d3a27541e603f0bac65089b1ecec8092acd7612))
+
 ### 0.2.1 (2026-01-24)
 
 ### Features
