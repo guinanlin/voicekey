@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.5](https://github.com/guinanlin/voicekey/compare/v0.2.4...v0.2.5) (2026-01-25)
+
+### Features
+
+- **hud:** add recording duration timer display ([90be740](https://github.com/guinanlin/voicekey/commit/90be740b208795d9b437976c3ae6c3c6a24f2ba0))
+
 ### [0.2.4](https://github.com/guinanlin/voicekey/compare/v0.2.3...v0.2.4) (2026-01-25)
 
 ### [0.2.3](https://github.com/guinanlin/voicekey/compare/v0.2.2...v0.2.3) (2026-01-25)
