@@ -364,7 +364,7 @@ function registerRoutes() {
         },
       },
     },
-    async (request, reply) => {
+    async (_request, reply) => {
       try {
         const statusInfo = textInjector.getStatus()
         // 如果服务可用（ready 或 warning），返回成功
