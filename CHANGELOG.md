@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.4](https://github.com/guinanlin/voicekey/compare/v0.2.3...v0.2.4) (2026-01-25)
+
 ### [0.2.3](https://github.com/guinanlin/voicekey/compare/v0.2.2...v0.2.3) (2026-01-25)
 
 ### Bug Fixes

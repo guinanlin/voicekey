@@ -1,7 +1,7 @@
 {
   "name": "voice-key",
   "private": true,
-  "version": "0.2.3",
+  "version": "0.2.4",
   "productName": "Voice Key",
   "type": "module",
   "scripts": {
