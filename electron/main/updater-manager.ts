@@ -3,7 +3,7 @@ import axios from 'axios'
 import semver from 'semver'
 import type { UpdateInfo } from '../shared/types'
 
-const GITHUB_REPO_OWNER = 'BuildWithAIs'
+const GITHUB_REPO_OWNER = 'guinanlin'
 const GITHUB_REPO_NAME = 'voicekey'
 
 export class UpdaterManager {
