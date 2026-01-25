@@ -170,7 +170,7 @@ jobs:
           # 清理所有挂载的 DMG 镜像，避免资源占用错误
           echo "Checking for mounted disk images..."
           hdiutil info || true
-          
+
           # 尝试卸载所有挂载的磁盘镜像
           for disk in $(hdiutil info | grep -E '^/dev/disk[0-9]+' | awk '{print $1}' || true); do
             if [ -n "$disk" ]; then
@@ -178,10 +178,10 @@ jobs:
               hdiutil detach "$disk" -force -quiet 2>/dev/null || true
             fi
           done
-          
+
           # 清理可能残留的临时文件
           rm -rf /tmp/*.dmg* 2>/dev/null || true
-          
+
           # 等待一下确保清理完成
           sleep 3
           echo "Cleanup completed"
