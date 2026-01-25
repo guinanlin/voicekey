@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.6](https://github.com/guinanlin/voicekey/compare/v0.2.5...v0.2.6) (2026-01-25)
+
+### Features
+
+- **updater:** implement auto-update with electron-updater ([b4b2cc0](https://github.com/guinanlin/voicekey/commit/b4b2cc0e46357bc11c85d205cd50d5ddd0fedaf3))
+
 ### [0.2.5](https://github.com/guinanlin/voicekey/compare/v0.2.4...v0.2.5) (2026-01-25)
 
 ### Features
