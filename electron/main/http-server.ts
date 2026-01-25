@@ -71,6 +71,7 @@ function registerRoutes() {
         'POST /clipboard/key - 按键模拟',
         'GET /clipboard/status - 服务状态',
         'GET /clipboard/permission - 权限检查',
+        'GET /clipboard/info - 服务信息检查',
       ],
     }),
   )
@@ -330,6 +331,59 @@ function registerRoutes() {
           platform_supported: false,
           dependencies_available: false,
           message: error instanceof Error ? error.message : '权限检查失败',
+        }
+      }
+    },
+  )
+
+  // GET /clipboard/info - 服务信息检查
+  fastify.get(
+    '/clipboard/info',
+    {
+      schema: {
+        operationId: 'clipboardInfo',
+        summary: 'GET /clipboard/info - 服务信息检查',
+        description:
+          '简单的服务信息检查端点（用于状态检查）。如果服务可用（ready 或 warning），返回成功；否则返回 503。',
+        tags: ['clipboard'],
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              service: { type: 'string' },
+            },
+          },
+          503: {
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              detail: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const statusInfo = textInjector.getStatus()
+        // 如果服务可用（ready 或 warning），返回成功
+        if (statusInfo.status === 'ready' || statusInfo.status === 'warning') {
+          return { status: 'ok', service: 'clipboard' }
+        } else {
+          // 服务不可用，返回 503
+          reply.code(503)
+          return {
+            status: 'error',
+            detail: '服务不可用',
+          }
+        }
+      } catch (error) {
+        console.error('[HTTP Server] /clipboard/info error:', error)
+        reply.code(503)
+        return {
+          status: 'error',
+          detail: error instanceof Error ? error.message : '服务检查失败',
         }
       }
     },
