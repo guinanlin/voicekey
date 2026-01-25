@@ -50,12 +50,27 @@ export interface HistoryItem {
   duration?: number
 }
 
+export type UpdateStatus =
+  | 'checking'
+  | 'available'
+  | 'not-available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error'
+
 export interface UpdateInfo {
   hasUpdate: boolean
   latestVersion: string
   releaseUrl: string
   releaseNotes: string
   error?: string
+  // 新增字段用于自动更新
+  status?: UpdateStatus
+  downloadProgress?: {
+    percent: number
+    transferred: number
+    total: number
+  }
 }
 
 // IPC 通道定义
@@ -94,7 +109,14 @@ export const IPC_CHANNELS = {
   CHECK_FOR_UPDATES: 'update:check',
   GET_UPDATE_STATUS: 'update:get-status',
   GET_APP_VERSION: 'app:version',
+  GET_IS_PACKAGED: 'app:is-packaged',
   OPEN_EXTERNAL: 'app:open-external',
+  DOWNLOAD_UPDATE: 'update:download',
+  INSTALL_UPDATE: 'update:install',
+  ON_UPDATE_DOWNLOAD_PROGRESS: 'update:download-progress',
+  ON_UPDATE_AVAILABLE: 'update:available',
+  ON_UPDATE_DOWNLOADED: 'update:downloaded',
+  ON_UPDATE_ERROR: 'update:error',
 } as const
 
 export type OverlayStatus = 'recording' | 'processing' | 'success' | 'error'

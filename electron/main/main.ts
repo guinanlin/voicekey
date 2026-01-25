@@ -152,8 +152,12 @@ function createSettingsWindow() {
   }
 
   settingsWindow.on('closed', () => {
+    UpdaterManager.setSettingsWindow(null)
     settingsWindow = null
   })
+
+  // 通知 UpdaterManager 设置窗口已创建
+  UpdaterManager.setSettingsWindow(settingsWindow)
 }
 
 // 创建录音状态浮窗 (透明、无边框、置顶)
@@ -826,8 +830,36 @@ function setupIPCHandlers() {
     return app.getVersion()
   })
 
+  ipcMain.handle(IPC_CHANNELS.GET_IS_PACKAGED, () => {
+    return app.isPackaged
+  })
+
   ipcMain.handle(IPC_CHANNELS.OPEN_EXTERNAL, (_event, url) => {
     UpdaterManager.openReleasePage(url)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.DOWNLOAD_UPDATE, async () => {
+    try {
+      await UpdaterManager.downloadUpdate()
+      return { success: true }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.INSTALL_UPDATE, async () => {
+    try {
+      await UpdaterManager.installUpdate()
+      return { success: true }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    }
   })
 }
 
@@ -845,6 +877,10 @@ app.whenReady().then(async () => {
   createMainWindow()
   createTray()
   setupIPCHandlers()
+  // 初始化 UpdaterManager（需要在 createMainWindow 之后，因为需要主窗口引用）
+  if (backgroundWindow) {
+    UpdaterManager.initialize(backgroundWindow)
+  }
   void UpdaterManager.checkForUpdates()
   registerGlobalHotkeys()
   ioHookManager.start()

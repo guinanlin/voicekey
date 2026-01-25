@@ -177,7 +177,10 @@ export default function SettingsPage() {
 
   // Update Logic
   const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [downloadingUpdate, setDownloadingUpdate] = useState(false)
+  const [installingUpdate, setInstallingUpdate] = useState(false)
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
+  const [isPackaged, setIsPackaged] = useState(true)
 
   useEffect(() => {
     if (hasLoadedUpdateStatus.current) return
@@ -195,6 +198,42 @@ export default function SettingsPage() {
     }
 
     loadUpdateStatus()
+
+    // 检查是否是打包版本
+    window.electronAPI
+      .getIsPackaged()
+      .then(setIsPackaged)
+      .catch(() => setIsPackaged(true))
+
+    // 监听更新事件
+    const unsubscribeProgress = window.electronAPI.onUpdateDownloadProgress((progress) => {
+      setUpdateInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'downloading',
+              downloadProgress: progress,
+            }
+          : null,
+      )
+    })
+
+    const unsubscribeAvailable = window.electronAPI.onUpdateAvailable((event, data) => {
+      if (data) {
+        setUpdateInfo(data)
+      }
+      if (event === 'downloaded') {
+        setDownloadingUpdate(false)
+      }
+      if (event === 'error') {
+        setDownloadingUpdate(false)
+      }
+    })
+
+    return () => {
+      unsubscribeProgress()
+      unsubscribeAvailable()
+    }
   }, [])
 
   const handleCheckUpdate = async () => {
@@ -211,9 +250,77 @@ export default function SettingsPage() {
         releaseUrl: '',
         releaseNotes: '',
         error: 'failed',
+        status: 'error',
       })
     } finally {
       setCheckingUpdate(false)
+    }
+  }
+
+  const handleDownloadUpdate = async () => {
+    if (!updateInfo?.hasUpdate) return
+
+    setDownloadingUpdate(true)
+    try {
+      const result = await window.electronAPI.downloadUpdate()
+      if (!result.success) {
+        setUpdateInfo((prev) =>
+          prev
+            ? {
+                ...prev,
+                error: result.error || 'Download failed',
+                status: 'error',
+              }
+            : null,
+        )
+        setDownloadingUpdate(false)
+      }
+      // 下载成功会通过事件监听器更新状态
+    } catch (error) {
+      console.error('Download update failed:', error)
+      setUpdateInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              error: error instanceof Error ? error.message : 'Download failed',
+              status: 'error',
+            }
+          : null,
+      )
+      setDownloadingUpdate(false)
+    }
+  }
+
+  const handleInstallUpdate = async () => {
+    setInstallingUpdate(true)
+    try {
+      const result = await window.electronAPI.installUpdate()
+      if (!result.success) {
+        console.error('Install update failed:', result.error)
+        setUpdateInfo((prev) =>
+          prev
+            ? {
+                ...prev,
+                error: result.error || 'Install failed',
+                status: 'error',
+              }
+            : null,
+        )
+      }
+      // 安装成功会重启应用
+    } catch (error) {
+      console.error('Install update failed:', error)
+      setUpdateInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              error: error instanceof Error ? error.message : 'Install failed',
+              status: 'error',
+            }
+          : null,
+      )
+    } finally {
+      setInstallingUpdate(false)
     }
   }
 
@@ -374,16 +481,77 @@ export default function SettingsPage() {
                   {updateInfo?.error && (
                     <p className="text-sm text-destructive">{t('settings.updateError')}</p>
                   )}
+                  {updateInfo?.status === 'downloading' && updateInfo.downloadProgress && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        {t('settings.downloadingUpdate', {
+                          percent: Math.round(updateInfo.downloadProgress.percent),
+                        })}
+                      </p>
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div
+                          className="bg-primary h-2 rounded-full transition-all"
+                          style={{ width: `${updateInfo.downloadProgress.percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {updateInfo?.status === 'downloaded' && (
+                    <p className="text-sm text-chart-2 font-medium">
+                      {t('settings.updateDownloaded')}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   {updateInfo?.hasUpdate ? (
-                    <Button
-                      size="sm"
-                      onClick={handleOpenRelease}
-                      className="cursor-pointer no-drag"
-                    >
-                      {t('settings.downloadUpdate')}
-                    </Button>
+                    <>
+                      {updateInfo.status === 'downloaded' ? (
+                        <Button
+                          size="sm"
+                          onClick={handleInstallUpdate}
+                          disabled={installingUpdate}
+                          className="cursor-pointer no-drag"
+                        >
+                          {installingUpdate
+                            ? t('settings.installingUpdate')
+                            : t('settings.installUpdate')}
+                        </Button>
+                      ) : updateInfo.status === 'downloading' ? (
+                        <Button size="sm" disabled className="cursor-pointer no-drag">
+                          {t('settings.downloadingUpdate', {
+                            percent: Math.round(updateInfo.downloadProgress?.percent || 0),
+                          })}
+                        </Button>
+                      ) : !isPackaged ? (
+                        // 开发环境下，直接显示"去 GitHub 下载"按钮
+                        <Button
+                          size="sm"
+                          onClick={handleOpenRelease}
+                          className="cursor-pointer no-drag"
+                        >
+                          {t('settings.downloadUpdate')}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={handleDownloadUpdate}
+                          disabled={downloadingUpdate}
+                          className="cursor-pointer no-drag"
+                        >
+                          {downloadingUpdate
+                            ? t('settings.downloadingUpdate', { percent: 0 })
+                            : t('settings.downloadUpdate')}
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenRelease}
+                        className="cursor-pointer no-drag"
+                      >
+                        {t('settings.openReleasePage')}
+                      </Button>
+                    </>
                   ) : (
                     <Button
                       variant="outline"

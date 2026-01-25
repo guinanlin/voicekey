@@ -53,7 +53,16 @@ export interface ElectronAPI {
   checkForUpdates: () => Promise<UpdateInfo>
   getUpdateStatus: () => Promise<UpdateInfo | null>
   getAppVersion: () => Promise<string>
+  getIsPackaged: () => Promise<boolean>
   openExternal: (url: string) => Promise<void>
+  downloadUpdate: () => Promise<{ success: boolean; error?: string }>
+  installUpdate: () => Promise<{ success: boolean; error?: string }>
+  onUpdateDownloadProgress: (
+    callback: (progress: { percent: number; transferred: number; total: number }) => void,
+  ) => () => void
+  onUpdateAvailable: (callback: (event: string, data?: UpdateInfo) => void) => () => void
+  onUpdateDownloaded: (callback: (data?: UpdateInfo) => void) => () => void
+  onUpdateError: (callback: (data?: UpdateInfo) => void) => () => void
 }
 
 // 暴露安全的API到渲染进程
@@ -146,5 +155,38 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkForUpdates: () => ipcRenderer.invoke(IPC_CHANNELS.CHECK_FOR_UPDATES),
   getUpdateStatus: () => ipcRenderer.invoke(IPC_CHANNELS.GET_UPDATE_STATUS),
   getAppVersion: () => ipcRenderer.invoke(IPC_CHANNELS.GET_APP_VERSION),
+  getIsPackaged: () => ipcRenderer.invoke(IPC_CHANNELS.GET_IS_PACKAGED),
   openExternal: (url: string) => ipcRenderer.invoke(IPC_CHANNELS.OPEN_EXTERNAL, url),
+  downloadUpdate: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_UPDATE),
+  installUpdate: () => ipcRenderer.invoke(IPC_CHANNELS.INSTALL_UPDATE),
+  onUpdateDownloadProgress: (
+    callback: (progress: { percent: number; transferred: number; total: number }) => void,
+  ) => {
+    const listener = (
+      _event: IpcRendererEvent,
+      progress: { percent: number; transferred: number; total: number },
+    ) => callback(progress)
+    ipcRenderer.on(IPC_CHANNELS.ON_UPDATE_DOWNLOAD_PROGRESS, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_UPDATE_DOWNLOAD_PROGRESS, listener)
+  },
+  onUpdateAvailable: (callback: (event: string, data?: UpdateInfo) => void) => {
+    const listener = (_event: IpcRendererEvent, event: string, data?: UpdateInfo) =>
+      callback(event, data)
+    ipcRenderer.on(IPC_CHANNELS.ON_UPDATE_AVAILABLE, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_UPDATE_AVAILABLE, listener)
+  },
+  onUpdateDownloaded: (callback: (data?: UpdateInfo) => void) => {
+    const listener = (_event: IpcRendererEvent, event: string, data?: UpdateInfo) => {
+      if (event === 'downloaded') callback(data)
+    }
+    ipcRenderer.on(IPC_CHANNELS.ON_UPDATE_AVAILABLE, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_UPDATE_AVAILABLE, listener)
+  },
+  onUpdateError: (callback: (data?: UpdateInfo) => void) => {
+    const listener = (_event: IpcRendererEvent, event: string, data?: UpdateInfo) => {
+      if (event === 'error') callback(data)
+    }
+    ipcRenderer.on(IPC_CHANNELS.ON_UPDATE_AVAILABLE, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ON_UPDATE_AVAILABLE, listener)
+  },
 } as ElectronAPI)
