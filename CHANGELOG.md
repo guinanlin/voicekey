@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.3](https://github.com/guinanlin/voicekey/compare/v0.2.2...v0.2.3) (2026-01-25)
+
+### Bug Fixes
+
+- **text-injector:** use clipboard paste on Linux to fix Chinese garbled output ([49ae920](https://github.com/guinanlin/voicekey/commit/49ae920d18f2e984908e342288f11bbbe833ed88))
+
 ### [0.2.2](https://github.com/guinanlin/voicekey/compare/v0.2.1...v0.2.2) (2026-01-25)
 
 ### Features
