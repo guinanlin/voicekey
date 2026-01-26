@@ -197,11 +197,12 @@ jobs:
 
       - name: Build macOS app (unsigned)
         run: |
-          # 设置环境变量以优化构建过程
+          # 使用 zip 替代 DMG，避免 GitHub Actions 上 hdiutil 反复失败
           export DEBUG=electron-builder:*
 
           npm run build -- \
             --mac ${{ matrix.args }} \
+            -c.mac.target=zip \
             -c.mac.identity=null \
             -c.mac.hardenedRuntime=false \
             --publish never
@@ -212,7 +213,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mac-artifacts-${{ matrix.arch }}
-          path: release/**/Voice*-Mac-*.dmg
+          path: release/**/Voice*-Mac-*.zip
           if-no-files-found: error
 
   # 3. 构建 Windows
@@ -269,7 +270,7 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            artifacts/**/Voice*-Mac-*.dmg
+            artifacts/**/Voice*-Mac-*.zip
             artifacts/**/Voice*-Windows-*-Setup.exe
           body: |
             ## 🎉 新版本发布！
@@ -277,9 +278,8 @@ jobs:
             **注意：本项目暂无商业签名证书，安装时可能会提示安全警告。**
 
             ### 🍎 macOS 用户
-            初次安装可能出现 “应用已损坏，无法打开” 或 “来自身份不明的开发者”。
-
-            请打开「终端」执行：
+            下载对应架构的 `.zip`（arm64 / x64），解压后将 **Voice Key.app** 拖入「应用程序」。  
+            若出现 “应用已损坏，无法打开” 或 “来自身份不明的开发者”，请打开「终端」执行：
 
             ```bash
             xattr -cr /Applications/Voice\ Key.app
