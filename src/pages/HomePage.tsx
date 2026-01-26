@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Kbd } from '@/components/ui/kbd'
@@ -48,13 +48,13 @@ export default function HomePage() {
   }, [])
 
   return (
-    <div className="max-w-4xl space-y-8">
-      <div className="space-y-2">
+    <div className="flex max-w-4xl flex-col gap-5">
+      <div className="space-y-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold text-foreground">{t('home.title')}</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('home.title')}</h1>
           {loading ? <Badge variant="outline">{t('common.loadingHistory')}</Badge> : null}
         </div>
-        <p className="text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           <Trans
             i18nKey="home.subtitle"
             values={{ hotkey: config.hotkey.pttKey || 'Ctrl+Shift+Space' }}

@@ -13,6 +13,11 @@ export interface ElectronAPI {
   // 系统信息
   platform: string
 
+  // 窗口控制（Windows/Linux）
+  minimizeWindow?: () => void
+  maximizeWindow?: () => void
+  closeWindow?: () => void
+
   // 配置相关
   getConfig: () => Promise<AppConfig>
   setConfig: (config: Partial<AppConfig>) => Promise<void>
@@ -69,6 +74,11 @@ export interface ElectronAPI {
 contextBridge.exposeInMainWorld('electronAPI', {
   // 系统信息
   platform: process.platform,
+
+  // 窗口控制（Windows/Linux）
+  minimizeWindow: () => ipcRenderer.send('window:minimize'),
+  maximizeWindow: () => ipcRenderer.send('window:maximize'),
+  closeWindow: () => ipcRenderer.send('window:close'),
 
   // 配置相关
   getConfig: () => ipcRenderer.invoke(IPC_CHANNELS.CONFIG_GET),

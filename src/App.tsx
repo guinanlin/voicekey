@@ -17,6 +17,17 @@ function App() {
     return () => window.removeEventListener('hashchange', handleHashChange)
   }, [])
 
+  const isMainWindow =
+    currentRoute === '/settings' || currentRoute === '/home' || currentRoute === '/history'
+  useEffect(() => {
+    if (isMainWindow) {
+      document.body.classList.add('main-window')
+    } else {
+      document.body.classList.remove('main-window')
+    }
+    return () => document.body.classList.remove('main-window')
+  }, [isMainWindow])
+
   // 后台窗口（无 hash）：只渲染录音组件
   // backgroundWindow 加载 http://localhost:5173/ (无 hash)
   if (!currentRoute || currentRoute === '/') {

@@ -69,18 +69,20 @@ export default function StatsOverview({ historyItems }: StatsOverviewProps) {
   }, [historyItems])
 
   return (
-    <section className="grid gap-4 sm:grid-cols-2">
-      <Card className="gap-3 py-4">
-        <CardHeader className="space-y-1 pb-0">
-          <CardDescription className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-muted-foreground" />
+    <section className="grid gap-3 sm:grid-cols-2">
+      <Card className="gap-2 py-3">
+        <CardHeader className="space-y-0.5 pb-0">
+          <CardDescription className="flex items-center gap-2 text-xs">
+            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
             {t('home.stats.totalCharacters')}
           </CardDescription>
-          <CardTitle className="text-2xl">{formatNumber(totalCharacters)}</CardTitle>
+          <CardTitle className="text-xl">{formatNumber(totalCharacters)}</CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="outline">{t('common.allTime')}</Badge>
+            <Badge variant="outline" className="text-[10px]">
+              {t('common.allTime')}
+            </Badge>
             <span>
               {t('home.stats.recentChange', {
                 value: formatNumber(recentCharacters),
@@ -91,17 +93,19 @@ export default function StatsOverview({ historyItems }: StatsOverviewProps) {
         </CardContent>
       </Card>
 
-      <Card className="gap-3 py-4">
-        <CardHeader className="space-y-1 pb-0">
-          <CardDescription className="flex items-center gap-2">
-            <Mic className="h-4 w-4 text-muted-foreground" />
+      <Card className="gap-2 py-3">
+        <CardHeader className="space-y-0.5 pb-0">
+          <CardDescription className="flex items-center gap-2 text-xs">
+            <Mic className="h-3.5 w-3.5 text-muted-foreground" />
             {t('home.stats.totalAudio')}
           </CardDescription>
-          <CardTitle className="text-2xl">{formatDuration(totalAudioMs)}</CardTitle>
+          <CardTitle className="text-xl">{formatDuration(totalAudioMs)}</CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="outline">{t('common.allTime')}</Badge>
+            <Badge variant="outline" className="text-[10px]">
+              {t('common.allTime')}
+            </Badge>
             <span>
               {t('home.stats.recentChange', {
                 value: formatDuration(recentAudioMs),

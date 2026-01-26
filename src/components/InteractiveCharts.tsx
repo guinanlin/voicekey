@@ -120,22 +120,22 @@ export default function InteractiveCharts({ historyItems, loading }: Interactive
   }, [historyItems, timeRange, dayFormatter])
 
   return (
-    <Card className="pt-0">
-      <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
-        <div className="grid flex-1 gap-1">
-          <CardTitle className="flex items-center gap-2">
+    <Card className="overflow-hidden pt-0">
+      <CardHeader className="flex items-center gap-2 space-y-0 border-b py-3 sm:flex-row sm:py-3">
+        <div className="grid min-w-0 flex-1 gap-0.5">
+          <CardTitle className="flex items-center gap-2 text-base">
             {t('home.chart.title')}
             {loading && (
-              <span className="text-sm font-normal text-muted-foreground">
+              <span className="text-xs font-normal text-muted-foreground">
                 ({t('common.loadingHistory', { defaultValue: 'Loading...' })})
               </span>
             )}
           </CardTitle>
-          <CardDescription>{t('home.chart.description')}</CardDescription>
+          <CardDescription className="text-xs">{t('home.chart.description')}</CardDescription>
         </div>
         <Select value={timeRange} onValueChange={setTimeRange}>
           <SelectTrigger
-            className="cursor-pointer hidden w-[160px] rounded-lg sm:ml-auto sm:flex"
+            className="cursor-pointer hidden w-[140px] shrink-0 rounded-lg sm:ml-auto sm:flex"
             aria-label="Select a value"
           >
             <SelectValue placeholder="Last 3 months" />
@@ -153,8 +153,8 @@ export default function InteractiveCharts({ historyItems, loading }: Interactive
           </SelectContent>
         </Select>
       </CardHeader>
-      <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-        <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
+      <CardContent className="px-2 pt-3 pb-4 sm:px-4 sm:pt-4 sm:pb-4">
+        <ChartContainer config={chartConfig} className="aspect-auto h-[160px] w-full min-h-0">
           <AreaChart data={filteredData}>
             <defs>
               <linearGradient id="fillCharacters" x1="0" y1="0" x2="0" y2="1">
@@ -167,8 +167,9 @@ export default function InteractiveCharts({ historyItems, loading }: Interactive
               dataKey="date"
               tickLine={false}
               axisLine={false}
-              tickMargin={8}
-              minTickGap={32}
+              tickMargin={6}
+              minTickGap={24}
+              tick={{ fontSize: 11 }}
               tickFormatter={(value) => {
                 const raw = value
                 // 如果是数字（时间戳），直接用；否则把 YYYY-MM-DD 当作本地日期解析

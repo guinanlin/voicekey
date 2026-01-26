@@ -123,16 +123,19 @@ function createSettingsWindow() {
     settingsWindow.focus()
     return
   }
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize
+  // 4:3 比例，适合管理界面
+  const isMac = process.platform === 'darwin'
   settingsWindow = new BrowserWindow({
-    width,
-    height,
-    minWidth: 600,
-    minHeight: 500,
+    width: 1000,
+    height: 750,
+    minWidth: 560,
+    minHeight: 420,
     title: t('window.settingsTitle'),
-    titleBarStyle: 'hiddenInset', // macOS 风格：隐藏标题栏但保留交通灯按钮
-    trafficLightPosition: { x: 20, y: 20 }, // 交通灯按钮位置
+    // 统一使用隐藏标题栏，在所有平台上自定义标题栏
+    titleBarStyle: isMac ? 'hiddenInset' : 'hidden', // macOS 保留交通灯，Windows/Linux 完全隐藏
+    trafficLightPosition: { x: 20, y: 20 }, // macOS 交通灯按钮位置
     vibrancy: 'sidebar', // macOS 毛玻璃效果（可选）
+    transparent: true, // 透明窗口，用于四角圆角
     backgroundColor: '#00000000', // 透明背景
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -806,6 +809,29 @@ function setupIPCHandlers() {
   ipcMain.on('set-ignore-mouse-events', (_event, ignore: boolean, options?: any) => {
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.setIgnoreMouseEvents(ignore, options)
+    }
+  })
+
+  // 窗口控制（Windows/Linux）
+  ipcMain.on('window:minimize', () => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.minimize()
+    }
+  })
+
+  ipcMain.on('window:maximize', () => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      if (settingsWindow.isMaximized()) {
+        settingsWindow.unmaximize()
+      } else {
+        settingsWindow.maximize()
+      }
+    }
+  })
+
+  ipcMain.on('window:close', () => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.close()
     }
   })
 

@@ -187,7 +187,10 @@
     "tooltip": "Voice Key"
   },
   "window": {
-    "settingsTitle": "Voice Key 设置"
+    "settingsTitle": "Voice Key 设置",
+    "minimize": "最小化",
+    "maximize": "最大化",
+    "close": "关闭"
   },
   "errors": {
     "ffmpegInitFailed": "FFmpeg 初始化失败",
