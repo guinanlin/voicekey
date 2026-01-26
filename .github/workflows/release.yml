@@ -165,8 +165,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Clean up mounted DMG images
+      - name: Clean up and prepare environment
         run: |
+          # 禁用 Spotlight 索引（这是导致 hdiutil 失败的主要原因）
+          echo "Disabling Spotlight indexing..."
+          sudo mdutil -a -i off || echo "Warning: Could not disable Spotlight (may require permissions)"
+
           # 清理所有挂载的 DMG 镜像，避免资源占用错误
           echo "Checking for mounted disk images..."
           hdiutil info || true
@@ -181,18 +185,28 @@ jobs:
 
           # 清理可能残留的临时文件
           rm -rf /tmp/*.dmg* 2>/dev/null || true
+          rm -rf ~/Library/Caches/electron-builder/* 2>/dev/null || true
 
+          # 检查并清理磁盘空间
+          echo "Disk space:"
+          df -h
+          
           # 等待一下确保清理完成
           sleep 3
           echo "Cleanup completed"
 
       - name: Build macOS app (unsigned)
         run: |
+          # 设置环境变量以优化构建过程
+          export DEBUG=electron-builder:*
+          
           npm run build -- \
             --mac ${{ matrix.args }} \
             -c.mac.identity=null \
             -c.mac.hardenedRuntime=false \
             --publish never
+        continue-on-error: false
+        timeout-minutes: 30
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4

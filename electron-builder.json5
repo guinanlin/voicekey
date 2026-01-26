@@ -33,6 +33,10 @@
   dmg: {
     // DMG 配置选项
     writeUpdateInfo: false,
+    // 明确指定文件系统格式，避免 hdiutil 失败
+    // APFS 格式适用于 macOS 10.12+，在 arm64 架构上更稳定
+    filesystem: 'APFS',
+    format: 'UDZO',
   },
   win: {
     target: [
