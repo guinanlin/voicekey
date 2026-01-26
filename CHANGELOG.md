@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.13](https://github.com/guinanlin/voicekey/compare/v0.2.12...v0.2.13) (2026-01-26)
+
+### Bug Fixes
+
+- **build:** remove invalid dmg filesystem config for electron-builder ([4da9e30](https://github.com/guinanlin/voicekey/commit/4da9e302b4cfb8b08e15736aae4d7d5ac493c269))
+
 ### [0.2.12](https://github.com/guinanlin/voicekey/compare/v0.2.11...v0.2.12) (2026-01-26)
 
 ### [0.2.11](https://github.com/guinanlin/voicekey/compare/v0.2.8...v0.2.11) (2026-01-26)
