@@ -32,8 +32,10 @@ export function AudioRecorder() {
     // 释放麦克风流
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => {
+        // eslint-disable-next-line no-console -- debug resource release
         console.log(`[Renderer] Releasing track: ${track.kind}, readyState: ${track.readyState}`)
         track.stop()
+        // eslint-disable-next-line no-console -- debug resource release
         console.log(`[Renderer] Track released, new readyState: ${track.readyState}`)
       })
       streamRef.current = null
@@ -49,6 +51,7 @@ export function AudioRecorder() {
     window.electronAPI.onStartRecording(async () => {
       // 录音状态守卫：防止重复录音
       if (isRecordingRef.current) {
+        // eslint-disable-next-line no-console -- debug duplicate start
         console.warn('[Renderer] Already recording, ignoring start request')
         return
       }
@@ -108,19 +111,23 @@ export function AudioRecorder() {
 
           // 释放所有资源
           releaseResources()
+          // eslint-disable-next-line no-console -- debug recording stop
           console.log('[Renderer] Recording stopped, resources released')
         }
 
         mediaRecorder.onerror = (e) => {
+          // eslint-disable-next-line no-console -- record recorder error
           console.error('[Renderer] MediaRecorder error:', e)
           window.electronAPI.sendError(`MediaRecorder error: ${e}`)
           // 错误时也释放资源
           releaseResources()
         }
 
+        // eslint-disable-next-line no-console -- debug recording start
         console.log('[Renderer] Recording started')
         mediaRecorder.start()
       } catch (err) {
+        // eslint-disable-next-line no-console -- report mic access failure
         console.error('[Renderer] Failed to start recording:', err)
         window.electronAPI.sendError(`Failed to access microphone: ${err}`)
         // 启动失败也要释放
@@ -129,6 +136,7 @@ export function AudioRecorder() {
     })
 
     window.electronAPI.onStopRecording(() => {
+      // eslint-disable-next-line no-console -- debug stop trigger
       console.log('[Renderer] onStopRecording triggered')
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop()
@@ -141,6 +149,7 @@ export function AudioRecorder() {
     // 组件卸载时清理
     return () => {
       releaseResources()
+      // eslint-disable-next-line no-console -- debug unmount cleanup
       console.log('[Renderer] Component unmounted, resources released')
     }
   }, [])

@@ -147,12 +147,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   onOverlayUpdate: (callback: (state: OverlayState) => void) => {
-    const listener = (_event: any, state: OverlayState) => callback(state)
+    const listener = (_event: IpcRendererEvent, state: OverlayState) => callback(state)
     ipcRenderer.on(IPC_CHANNELS.OVERLAY_UPDATE, listener)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.OVERLAY_UPDATE, listener)
   },
   onAudioLevel: (callback: (level: number) => void) => {
-    const listener = (_event: any, level: number) => callback(level)
+    const listener = (_event: IpcRendererEvent, level: number) => callback(level)
     ipcRenderer.on(IPC_CHANNELS.OVERLAY_AUDIO_LEVEL, listener)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.OVERLAY_AUDIO_LEVEL, listener)
   },

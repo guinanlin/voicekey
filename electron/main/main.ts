@@ -27,8 +27,9 @@ import { ioHookManager } from './iohook-manager'
 import { textInjector } from './text-injector'
 import { UpdaterManager } from './updater-manager'
 import { startHttpServer, stopHttpServer } from './http-server'
-import { IPC_CHANNELS, OverlayState, VoiceSession } from '../shared/types'
+import { ASRConfig, IPC_CHANNELS, OverlayState, VoiceSession } from '../shared/types'
 // ES Module compatibility - 延迟导入 fluent-ffmpeg 避免启动时的 __dirname 错误
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let ffmpeg: any
 let ffmpegInitialized = false
 
@@ -766,7 +767,7 @@ function setupIPCHandlers() {
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.CONFIG_TEST, async (_event, config?: any) => {
+  ipcMain.handle(IPC_CHANNELS.CONFIG_TEST, async (_event, config?: ASRConfig) => {
     if (config) {
       const tempProvider = new ASRProvider(config)
       return await tempProvider.testConnection()
@@ -806,11 +807,14 @@ function setupIPCHandlers() {
     }
   })
 
-  ipcMain.on('set-ignore-mouse-events', (_event, ignore: boolean, options?: any) => {
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.setIgnoreMouseEvents(ignore, options)
-    }
-  })
+  ipcMain.on(
+    'set-ignore-mouse-events',
+    (_event, ignore: boolean, options?: { forward?: boolean }) => {
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.setIgnoreMouseEvents(ignore, options)
+      }
+    },
+  )
 
   // 窗口控制（Windows/Linux）
   ipcMain.on('window:minimize', () => {

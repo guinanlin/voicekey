@@ -190,7 +190,7 @@ jobs:
           # 检查并清理磁盘空间
           echo "Disk space:"
           df -h
-          
+
           # 等待一下确保清理完成
           sleep 3
           echo "Cleanup completed"
@@ -199,7 +199,7 @@ jobs:
         run: |
           # 设置环境变量以优化构建过程
           export DEBUG=electron-builder:*
-          
+
           npm run build -- \
             --mac ${{ matrix.args }} \
             -c.mac.identity=null \

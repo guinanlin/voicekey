@@ -16,6 +16,7 @@ export const initI18n = async (): Promise<void> => {
       languageSetting = config.app.language
     }
   } catch (error) {
+    // eslint-disable-next-line no-console -- fallback notice when config unavailable
     console.warn('[i18n] Failed to load config, using system language.', error)
   }
 

@@ -64,6 +64,7 @@ export default function SettingsPage() {
         )
         void i18n.changeLanguage(resolvedLanguage)
       } catch (error) {
+        // eslint-disable-next-line no-console -- report config load failure
         console.error('Failed to load config:', error)
       }
     }
@@ -83,6 +84,7 @@ export default function SettingsPage() {
     const resolvedLanguage = resolveLanguage(setting, navigator.language)
     void i18n.changeLanguage(resolvedLanguage)
     void window.electronAPI.setConfig({ app: { language: setting } }).catch((error) => {
+      // eslint-disable-next-line no-console -- report persist failure
       console.error('Failed to persist app language:', error)
     })
   }
@@ -193,6 +195,7 @@ export default function SettingsPage() {
           setUpdateInfo(info)
         }
       } catch (error) {
+        // eslint-disable-next-line no-console -- report update status load failure
         console.error('Failed to load update status:', error)
       }
     }
@@ -243,6 +246,7 @@ export default function SettingsPage() {
       const info = await window.electronAPI.checkForUpdates()
       setUpdateInfo(info)
     } catch (error) {
+      // eslint-disable-next-line no-console -- report update check failure
       console.error('Update check failed:', error)
       setUpdateInfo({
         hasUpdate: false,
@@ -277,6 +281,7 @@ export default function SettingsPage() {
       }
       // 下载成功会通过事件监听器更新状态
     } catch (error) {
+      // eslint-disable-next-line no-console -- report download failure
       console.error('Download update failed:', error)
       setUpdateInfo((prev) =>
         prev
@@ -296,6 +301,7 @@ export default function SettingsPage() {
     try {
       const result = await window.electronAPI.installUpdate()
       if (!result.success) {
+        // eslint-disable-next-line no-console -- report install failure
         console.error('Install update failed:', result.error)
         setUpdateInfo((prev) =>
           prev
@@ -309,6 +315,7 @@ export default function SettingsPage() {
       }
       // 安装成功会重启应用
     } catch (error) {
+      // eslint-disable-next-line no-console -- report install failure
       console.error('Install update failed:', error)
       setUpdateInfo((prev) =>
         prev

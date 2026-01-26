@@ -26,6 +26,7 @@ export default function HomePage() {
         const loadedConfig = await window.electronAPI.getConfig()
         setConfig(loadedConfig)
       } catch (error) {
+        // eslint-disable-next-line no-console -- report config load failure
         console.error('Failed to load config:', error)
       }
     }
@@ -39,6 +40,7 @@ export default function HomePage() {
         const data = await window.electronAPI.getHistory()
         setHistoryItems(data)
       } catch (error) {
+        // eslint-disable-next-line no-console -- report history load failure
         console.error('Failed to load history:', error)
       } finally {
         setLoading(false)

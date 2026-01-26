@@ -101,7 +101,7 @@ export class ASRProvider {
         created: response.data.created || Date.now(),
         model: response.data.model || GLM_ASR.MODEL,
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       const errorDuration = Date.now() - transcribeStartTime
       console.error(`[ASR] Transcription failed after ${errorDuration}ms`)
       if (axios.isAxiosError(error)) {

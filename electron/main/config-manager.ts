@@ -54,7 +54,9 @@ export class ConfigManager {
       const currentApiKeys = this.store.get('asr.apiKeys', { cn: '', intl: '' })
       if (!currentApiKeys.cn) {
         this.store.set('asr.apiKeys.cn', asrConfig.apiKey)
-        this.store.delete('asr.apiKey' as any) // 迁移后删除旧字段
+        // 旧字段路径，Store 类型不包含 deprecated 键
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        this.store.delete('asr.apiKey' as any)
       }
     }
   }

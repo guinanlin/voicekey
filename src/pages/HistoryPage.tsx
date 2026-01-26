@@ -1,4 +1,4 @@
-﻿import * as React from 'react'
+import * as React from 'react'
 import { Search, Filter, Clock, Copy, Trash2, Mic } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -74,6 +74,7 @@ export default function HistoryPage() {
       const data = await window.electronAPI.getHistory()
       setItems(data)
     } catch (error) {
+      // eslint-disable-next-line no-console -- report history load failure
       console.error('Failed to load history:', error)
       toast.error(t('history.loadFailed'))
     } finally {
@@ -123,6 +124,7 @@ export default function HistoryPage() {
         setItems((prev) => prev.filter((item) => item.id !== id))
         toast.success(t('history.deleteSuccess'))
       } catch (error) {
+        // eslint-disable-next-line no-console -- report delete failure
         console.error('Failed to delete item:', error)
         toast.error(t('history.deleteFailed'))
       }
@@ -137,6 +139,7 @@ export default function HistoryPage() {
       setItems([])
       toast.success(t('history.clearSuccess'))
     } catch (error) {
+      // eslint-disable-next-line no-console -- report clear failure
       console.error('Failed to clear history:', error)
       toast.error(t('history.clearFailed'))
     }

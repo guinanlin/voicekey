@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Keyboard, RotateCcw, Save } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -53,6 +53,7 @@ export function HotkeySettings() {
         setConfig(cfg.hotkey)
         setOriginalConfig(cfg.hotkey)
       } catch (error) {
+        // eslint-disable-next-line no-console -- report config load failure
         console.error('Failed to load config:', error)
         toast.error(t('hotkey.toast.loadFailed'))
       } finally {
