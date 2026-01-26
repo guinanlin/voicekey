@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.10](https://github.com/guinanlin/voicekey/compare/v0.2.9...v0.2.10) (2026-01-26)
+
+### Features
+
+- **ui:** custom settings window, rounded corners, compact home layout ([7afefc5](https://github.com/guinanlin/voicekey/commit/7afefc58953235fbaa6d34ae424359bbd3696a57))
+
 ### [0.2.9](https://github.com/guinanlin/voicekey/compare/v0.2.8...v0.2.9) (2026-01-25)
 
 ### Bug Fixes
