@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.11](https://github.com/guinanlin/voicekey/compare/v0.2.8...v0.2.11) (2026-01-26)
+
+### Features
+
+- **ui:** custom settings window, rounded corners, compact home layout ([7afefc5](https://github.com/guinanlin/voicekey/commit/7afefc58953235fbaa6d34ae424359bbd3696a57))
+
+### Bug Fixes
+
+- **build:** move dmg config to top-level in electron-builder ([4eec591](https://github.com/guinanlin/voicekey/commit/4eec591b7362fd58bd7e7462a3d170c415c59943))
+- **ci:** resolve macOS DMG creation failure in GitHub Actions ([27f6338](https://github.com/guinanlin/voicekey/commit/27f6338ef470efc4dd85af8afc94c8ae69833618))
+- **lint:** resolve eslint, prettier and type-check issues for quality ([6ab0d15](https://github.com/guinanlin/voicekey/commit/6ab0d159ed24c5e2fd4d46082cb189d9230e5469))
+
 ### [0.2.10](https://github.com/guinanlin/voicekey/compare/v0.2.9...v0.2.10) (2026-01-26)
 
 ### Features
