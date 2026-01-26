@@ -1,12 +1,12 @@
 {
   "app": {
-    "name": "Voice Key",
+    "name": "汤圆传声筒",
     "version": "版本 {{version}}"
   },
   "nav": {
     "home": "首页",
     "settings": "设置",
-    "history": "历史记录"
+    "history": "历史"
   },
   "common": {
     "loading": "加载中...",
@@ -16,7 +16,7 @@
     "unknownError": "未知错误"
   },
   "home": {
-    "title": "自然说话，完美成文",
+    "title": "自然说话，声落成文",
     "subtitle": "按住 <kbd>{{hotkey}}</kbd> 说话，松开即可插入文本。",
     "stats": {
       "totalCharacters": "识别字符总数",

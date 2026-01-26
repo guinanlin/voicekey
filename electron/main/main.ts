@@ -15,6 +15,7 @@ import fs from 'fs'
 app.commandLine.appendSwitch('disable-gpu')
 app.commandLine.appendSwitch('disable-gpu-sandbox')
 import { createRequire } from 'node:module'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { UiohookKey } from 'uiohook-napi'
@@ -890,6 +891,27 @@ function setupIPCHandlers() {
         error: error instanceof Error ? error.message : 'Unknown error',
       }
     }
+  })
+
+  // 网络相关
+  ipcMain.handle(IPC_CHANNELS.GET_LOCAL_IP, () => {
+    const interfaces = os.networkInterfaces()
+    const ips: string[] = []
+
+    for (const name of Object.keys(interfaces)) {
+      const iface = interfaces[name]
+      if (!iface) continue
+
+      for (const addr of iface) {
+        // 跳过内部（非IPv4）和回环地址
+        if (addr.family === 'IPv4' && !addr.internal) {
+          ips.push(addr.address)
+        }
+      }
+    }
+
+    // 返回第一个找到的IP地址，如果没有则返回空字符串
+    return ips[0] || ''
   })
 }
 

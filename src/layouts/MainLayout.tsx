@@ -99,7 +99,7 @@ export default function MainLayout({ children, currentRoute }: MainLayoutProps) 
           </nav>
 
           {/* 底部信息 */}
-          <div className="p-4  border-t border-sidebar-border">
+          <div className="py-2 px-3 border-t border-sidebar-border">
             <p className="text-xs text-muted-foreground">
               {t('app.version', { version: __APP_VERSION__ })}
             </p>

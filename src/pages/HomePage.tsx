@@ -5,6 +5,7 @@ import { Kbd } from '@/components/ui/kbd'
 
 import InteractiveCharts, { HistoryItem } from '@/components/InteractiveCharts'
 import StatsOverview from '@/components/StatsOverview'
+import ServiceStatusCard from '@/components/ServiceStatusCard'
 
 interface Config {
   hotkey: {
@@ -50,8 +51,8 @@ export default function HomePage() {
   }, [])
 
   return (
-    <div className="flex max-w-4xl flex-col gap-5">
-      <div className="space-y-1">
+    <div className="flex max-w-4xl flex-col gap-3">
+      <div className="space-y-0.5">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-bold text-foreground">{t('home.title')}</h1>
           {loading ? <Badge variant="outline">{t('common.loadingHistory')}</Badge> : null}
@@ -65,7 +66,14 @@ export default function HomePage() {
         </p>
       </div>
 
-      <StatsOverview historyItems={historyItems} />
+      <div className="flex flex-col md:flex-row gap-2.5 items-stretch">
+        <div className="flex-1 flex min-h-0">
+          <ServiceStatusCard />
+        </div>
+        <div className="flex-1 flex flex-col gap-2.5 min-h-0">
+          <StatsOverview historyItems={historyItems} />
+        </div>
+      </div>
 
       <InteractiveCharts historyItems={historyItems} loading={loading} />
     </div>

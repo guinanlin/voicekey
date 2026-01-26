@@ -62,6 +62,9 @@ export interface ElectronAPI {
   openExternal: (url: string) => Promise<void>
   downloadUpdate: () => Promise<{ success: boolean; error?: string }>
   installUpdate: () => Promise<{ success: boolean; error?: string }>
+
+  // 网络相关
+  getLocalIP: () => Promise<string>
   onUpdateDownloadProgress: (
     callback: (progress: { percent: number; transferred: number; total: number }) => void,
   ) => () => void
@@ -169,6 +172,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternal: (url: string) => ipcRenderer.invoke(IPC_CHANNELS.OPEN_EXTERNAL, url),
   downloadUpdate: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_UPDATE),
   installUpdate: () => ipcRenderer.invoke(IPC_CHANNELS.INSTALL_UPDATE),
+  getLocalIP: () => ipcRenderer.invoke(IPC_CHANNELS.GET_LOCAL_IP),
   onUpdateDownloadProgress: (
     callback: (progress: { percent: number; transferred: number; total: number }) => void,
   ) => {

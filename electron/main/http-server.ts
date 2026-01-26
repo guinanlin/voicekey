@@ -1,12 +1,19 @@
 import Fastify from 'fastify'
 import swagger from '@fastify/swagger'
 import swaggerUI from '@fastify/swagger-ui'
+import cors from '@fastify/cors'
 import { textInjector } from './text-injector'
 
 const fastify = Fastify({
   logger: {
     level: 'info',
   },
+})
+
+// 注册 CORS 插件
+fastify.register(cors, {
+  origin: true, // 允许所有来源
+  credentials: true,
 })
 
 // 添加请求处理hook确保UTF-8编码正确处理

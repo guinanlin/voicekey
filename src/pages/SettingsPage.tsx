@@ -338,21 +338,39 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-foreground mb-6">{t('settings.title')}</h1>
-
+    <div className="flex max-w-4xl flex-col gap-5">
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="general">{t('settings.appPreferences')}</TabsTrigger>
-          <TabsTrigger value="asr">{t('settings.asrConfig')}</TabsTrigger>
-          <TabsTrigger value="hotkeys">{t('hotkey.title')}</TabsTrigger>
-          <TabsTrigger value="about">{t('settings.about')}</TabsTrigger>
+        <TabsList className="h-8 bg-muted/50 p-0.5 rounded-md">
+          <TabsTrigger
+            value="general"
+            className="px-3 py-1 text-xs h-7 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            {t('settings.appPreferences')}
+          </TabsTrigger>
+          <TabsTrigger
+            value="asr"
+            className="px-3 py-1 text-xs h-7 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            {t('settings.asrConfig')}
+          </TabsTrigger>
+          <TabsTrigger
+            value="hotkeys"
+            className="px-3 py-1 text-xs h-7 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            {t('hotkey.title')}
+          </TabsTrigger>
+          <TabsTrigger
+            value="about"
+            className="px-3 py-1 text-xs h-7 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            {t('settings.about')}
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="space-y-6">
+        <TabsContent value="general" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>{t('settings.appPreferences')}</CardTitle>
+              <CardTitle className="text-xl font-bold">{t('settings.appPreferences')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -390,10 +408,10 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="asr" className="space-y-6">
+        <TabsContent value="asr" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>{t('settings.asrConfig')}</CardTitle>
+              <CardTitle className="text-xl font-bold">{t('settings.asrConfig')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -462,14 +480,14 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="hotkeys" className="space-y-6">
+        <TabsContent value="hotkeys" className="space-y-6 mt-6">
           <HotkeySettings />
         </TabsContent>
 
-        <TabsContent value="about" className="space-y-6">
+        <TabsContent value="about" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>{t('settings.about')}</CardTitle>
+              <CardTitle className="text-xl font-bold">{t('settings.about')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">

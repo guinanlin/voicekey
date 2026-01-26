@@ -69,16 +69,16 @@ export default function StatsOverview({ historyItems }: StatsOverviewProps) {
   }, [historyItems])
 
   return (
-    <section className="grid gap-3 sm:grid-cols-2">
-      <Card className="gap-2 py-3">
-        <CardHeader className="space-y-0.5 pb-0">
+    <>
+      <Card className="gap-1.5 py-2.5 flex-1 flex flex-col">
+        <CardHeader className="space-y-0.5 pb-0 flex-shrink-0">
           <CardDescription className="flex items-center gap-2 text-xs">
             <FileText className="h-3.5 w-3.5 text-muted-foreground" />
             {t('home.stats.totalCharacters')}
           </CardDescription>
           <CardTitle className="text-xl">{formatNumber(totalCharacters)}</CardTitle>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="pt-0 flex-1 flex flex-col justify-end">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="outline" className="text-[10px]">
               {t('common.allTime')}
@@ -93,15 +93,15 @@ export default function StatsOverview({ historyItems }: StatsOverviewProps) {
         </CardContent>
       </Card>
 
-      <Card className="gap-2 py-3">
-        <CardHeader className="space-y-0.5 pb-0">
+      <Card className="gap-1.5 py-2.5 flex-1 flex flex-col">
+        <CardHeader className="space-y-0.5 pb-0 flex-shrink-0">
           <CardDescription className="flex items-center gap-2 text-xs">
             <Mic className="h-3.5 w-3.5 text-muted-foreground" />
             {t('home.stats.totalAudio')}
           </CardDescription>
           <CardTitle className="text-xl">{formatDuration(totalAudioMs)}</CardTitle>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="pt-0 flex-1 flex flex-col justify-end">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="outline" className="text-[10px]">
               {t('common.allTime')}
@@ -115,6 +115,6 @@ export default function StatsOverview({ historyItems }: StatsOverviewProps) {
           </div>
         </CardContent>
       </Card>
-    </section>
+    </>
   )
 }

@@ -117,6 +117,9 @@ export const IPC_CHANNELS = {
   ON_UPDATE_AVAILABLE: 'update:available',
   ON_UPDATE_DOWNLOADED: 'update:downloaded',
   ON_UPDATE_ERROR: 'update:error',
+
+  // 网络相关
+  GET_LOCAL_IP: 'network:get-local-ip',
 } as const
 
 export type OverlayStatus = 'recording' | 'processing' | 'success' | 'error'
