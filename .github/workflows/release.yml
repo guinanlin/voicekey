@@ -245,9 +245,38 @@ jobs:
           path: release/**/Voice*-Windows-*-Setup.exe
           if-no-files-found: error
 
-  # 4. 发布 Release
+  # 4. 构建 Linux（仅新增，不改动 build-mac / build-win）
+  build-linux:
+    needs: [prepare-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.new_tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Linux app (AppImage)
+        run: npm run build -- --linux --publish never
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: release/**/Voice*-Linux-*.AppImage
+          if-no-files-found: error
+
+  # 5. 发布 Release（mac/win 逻辑不变，仅增加 linux 下载与附件）
   release:
-    needs: [prepare-release, build-mac, build-win]
+    needs: [prepare-release, build-mac, build-win, build-linux]
     runs-on: ubuntu-latest
     steps:
       - name: Download macOS artifacts
@@ -263,6 +292,12 @@ jobs:
           name: win-artifacts
           path: artifacts
 
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-artifacts
+          path: artifacts
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -272,6 +307,7 @@ jobs:
           files: |
             artifacts/**/Voice*-Mac-*.zip
             artifacts/**/Voice*-Windows-*-Setup.exe
+            artifacts/**/Voice*-Linux-*.AppImage
           body: |
             ## 🎉 新版本发布！
 
@@ -290,6 +326,14 @@ jobs:
 
             1. 点击 “更多信息”
             2. 点击 “仍要运行”
+
+            ### 🐧 Linux 用户
+            下载 `.AppImage`，赋予执行权限后运行：
+
+            ```bash
+            chmod +x Voice*-Linux-*.AppImage
+            ./Voice*-Linux-*.AppImage
+            ```
 
             ---
 
