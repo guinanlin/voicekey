@@ -264,14 +264,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Linux app (AppImage)
+      - name: Build Linux app (deb)
         run: npm run build -- --linux --publish never
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: linux-artifacts
-          path: release/**/Voice*-Linux-*.AppImage
+          path: release/**/Voice*-Linux-*.deb
           if-no-files-found: error
 
   # 5. 发布 Release（mac/win 逻辑不变，仅增加 linux 下载与附件）
@@ -307,7 +307,7 @@ jobs:
           files: |
             artifacts/**/Voice*-Mac-*.zip
             artifacts/**/Voice*-Windows-*-Setup.exe
-            artifacts/**/Voice*-Linux-*.AppImage
+            artifacts/**/Voice*-Linux-*.deb
           body: |
             ## 🎉 新版本发布！
 
@@ -327,12 +327,13 @@ jobs:
             1. 点击 “更多信息”
             2. 点击 “仍要运行”
 
-            ### 🐧 Linux 用户
-            下载 `.AppImage`，赋予执行权限后运行：
+            ### 🐧 Linux 用户（Ubuntu / Debian）
+            下载 `.deb` 后安装：
 
             ```bash
-            chmod +x Voice*-Linux-*.AppImage
-            ./Voice*-Linux-*.AppImage
+            sudo dpkg -i Voice*-Linux-*.deb
+            # 若有依赖缺失可执行：
+            sudo apt-get install -f
             ```
 
             ---
