@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.19](https://github.com/guinanlin/voicekey/compare/v0.2.18...v0.2.19) (2026-03-06)
+
+### Bug Fixes
+
+- **build:** add description and author for Linux .deb package ([9b07973](https://github.com/guinanlin/voicekey/commit/9b079731f281b75b71d557ef7875e56112910f8a))
+
 ### [0.2.18](https://github.com/guinanlin/voicekey/compare/v0.2.17...v0.2.18) (2026-03-06)
 
 ### [0.2.17](https://github.com/guinanlin/voicekey/compare/v0.2.14...v0.2.17) (2026-03-06)
