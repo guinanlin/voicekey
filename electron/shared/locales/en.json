@@ -75,6 +75,8 @@
     "regionChina": "China",
     "regionIntl": "International",
     "apiKey": "API Key",
+    "showApiKey": "Show Key",
+    "hideApiKey": "Hide Key",
     "apiKeyPlaceholder": "Enter your GLM API Key",
     "apiKeyHelp": "Get your API Key from",
     "apiEndpoint": "API Endpoint (Optional)",
@@ -136,7 +138,8 @@
     },
     "presets": {
       "command": "⌘ Command (recommended)",
-      "control": "⌃ Control",
+      "control": "Left Ctrl",
+      "controlRight": "Right Ctrl",
       "option": "⌥ Option",
       "shift": "⇧ Shift",
       "commandSpace": "⌘ + Space",

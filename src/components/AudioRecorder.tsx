@@ -48,6 +48,11 @@ export function AudioRecorder() {
   }
 
   useEffect(() => {
+    if (!window.electronAPI) {
+      // 非 Electron 环境（如纯浏览器访问 localhost）时 electronAPI 不存在，跳过注册
+      return
+    }
+
     window.electronAPI.onStartRecording(async () => {
       // 录音状态守卫：防止重复录音
       if (isRecordingRef.current) {

@@ -1,7 +1,18 @@
-﻿/**
+/**
  * 快捷键工具函数
  * 用于处理 Electron Accelerator 格式的快捷键
  */
+
+// 所有修饰键名称（含左/右区分）
+const ALL_MODIFIER_NAMES = [
+  'Command',
+  'Control',
+  'ControlRight',
+  'Alt',
+  'AltRight',
+  'Shift',
+  'ShiftRight',
+]
 
 // macOS 系统保留快捷键（不允许用户设置）
 export const RESERVED_HOTKEYS = [
@@ -28,10 +39,13 @@ export const RESERVED_HOTKEYS = [
 export const PTT_PRESETS = [
   { value: 'Command', labelKey: 'hotkey.presets.command', platform: 'darwin' },
   { value: 'Control', labelKey: 'hotkey.presets.control', platform: 'all' },
+  { value: 'ControlRight', labelKey: 'hotkey.presets.controlRight', platform: 'linux' },
+  { value: 'ControlRight', labelKey: 'hotkey.presets.controlRight', platform: 'win32' },
   { value: 'Alt', labelKey: 'hotkey.presets.option', platform: 'darwin' },
   { value: 'Shift', labelKey: 'hotkey.presets.shift', platform: 'all' },
   { value: 'Command+Space', labelKey: 'hotkey.presets.commandSpace', platform: 'darwin' },
   { value: 'Control+Space', labelKey: 'hotkey.presets.controlSpace', platform: 'win32' },
+  { value: 'Control+Space', labelKey: 'hotkey.presets.controlSpace', platform: 'linux' },
   { value: 'F13', labelKey: 'hotkey.presets.f13', platform: 'all' },
   { value: 'F14', labelKey: 'hotkey.presets.f14', platform: 'all' },
 ] as const
@@ -40,15 +54,16 @@ export type HotkeyValidationMessage = 'missing' | 'conflict' | 'multiple'
 
 /**
  * 将 KeyboardEvent 的 key 转换为 Electron Accelerator 格式
+ * 修饰键使用 e.code 区分左右侧（ControlLeft → Control，ControlRight → ControlRight）
  */
 export function normalizeKey(e: KeyboardEvent): string | null {
   const { key, code } = e
 
-  // 修饰键映射
-  if (key === 'Meta') return 'Command'
-  if (key === 'Control') return 'Control'
-  if (key === 'Alt') return 'Alt'
-  if (key === 'Shift') return 'Shift'
+  // 修饰键映射 - 通过 code 区分左右
+  if (key === 'Meta') return code === 'MetaRight' ? 'CommandRight' : 'Command'
+  if (key === 'Control') return code === 'ControlRight' ? 'ControlRight' : 'Control'
+  if (key === 'Alt') return code === 'AltRight' ? 'AltRight' : 'Alt'
+  if (key === 'Shift') return code === 'ShiftRight' ? 'ShiftRight' : 'Shift'
 
   // 特殊键映射
   if (key === ' ') return 'Space'
@@ -97,9 +112,19 @@ export function normalizeKey(e: KeyboardEvent): string | null {
 
 /**
  * 将按键集合转换为 Electron Accelerator 字符串
+ * 修饰键（含左右区分）放前面，普通键放最后
  */
 export function buildAccelerator(keys: Set<string>): string {
-  const modifierOrder = ['Command', 'Control', 'Alt', 'Shift']
+  const modifierOrder = [
+    'Command',
+    'CommandRight',
+    'Control',
+    'ControlRight',
+    'Alt',
+    'AltRight',
+    'Shift',
+    'ShiftRight',
+  ]
   const modifiers = modifierOrder.filter((m) => keys.has(m))
   const mainKeys = [...keys].filter((k) => !modifierOrder.includes(k))
 
@@ -115,7 +140,8 @@ export function buildAccelerator(keys: Set<string>): string {
 }
 
 /**
- * 格式化显示快捷键（转换为符号）
+ * 格式化显示快捷键（转换为可读符号）
+ * 注意：右侧修饰键需在左侧修饰键之前替换，避免部分匹配
  */
 export function formatHotkey(accelerator: string, fallback = ''): string {
   if (!accelerator) return fallback
@@ -124,19 +150,23 @@ export function formatHotkey(accelerator: string, fallback = ''): string {
 
   if (isMac) {
     return accelerator
+      .replace(/ControlRight/g, '右⌃')
       .replace(/Command/g, '⌘')
       .replace(/Control/g, '⌃')
+      .replace(/AltRight/g, '右⌥')
       .replace(/Alt/g, '⌥')
+      .replace(/ShiftRight/g, '右⇧')
       .replace(/Shift/g, '⇧')
       .replace(/Space/g, '␣')
       .replace(/\+/g, ' ')
   }
 
   return accelerator
+    .replace(/ControlRight/g, '右Ctrl')
     .replace(/Command/g, 'Win')
     .replace(/Control/g, 'Ctrl')
-    .replace(/Alt/g, 'Alt')
-    .replace(/Shift/g, 'Shift')
+    .replace(/AltRight/g, '右Alt')
+    .replace(/ShiftRight/g, '右Shift')
     .replace(/Space/g, 'Space')
 }
 
@@ -162,10 +192,9 @@ export function validateHotkey(accelerator: string): {
     return { valid: false, messageKey: 'conflict' }
   }
 
-  // 新增：检查非修饰键数量
+  // 检查非修饰键数量（含左右区分的修饰键名）
   const parts = accelerator.split('+')
-  const modifiers = ['Command', 'Control', 'Alt', 'Shift']
-  const nonModifiers = parts.filter((p) => !modifiers.includes(p))
+  const nonModifiers = parts.filter((p) => !ALL_MODIFIER_NAMES.includes(p))
 
   if (nonModifiers.length > 1) {
     return { valid: false, messageKey: 'multiple' }
@@ -175,7 +204,7 @@ export function validateHotkey(accelerator: string): {
 }
 
 /**
- * 检测是否为单独的修饰键
+ * 检测是否为单独的修饰键（使用 KeyboardEvent.key，左右相同）
  */
 export function isModifierOnly(key: string): boolean {
   return ['Meta', 'Control', 'Alt', 'Shift'].includes(key)
@@ -185,6 +214,5 @@ export function isModifierOnly(key: string): boolean {
  * 检测按键集合中是否包含非修饰键
  */
 export function hasNonModifierKey(keys: Set<string>): boolean {
-  const modifiers = ['Command', 'Control', 'Alt', 'Shift']
-  return [...keys].some((k) => !modifiers.includes(k))
+  return [...keys].some((k) => !ALL_MODIFIER_NAMES.includes(k))
 }

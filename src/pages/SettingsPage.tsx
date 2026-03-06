@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
+import { CheckCircle2, XCircle, AlertTriangle, Eye, EyeOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { resolveLanguage, type LanguageSetting } from '@electron/shared/i18n'
 import type { AppConfig, UpdateInfo } from '@electron/shared/types'
@@ -47,6 +47,7 @@ export default function SettingsPage() {
     message: string
   } | null>(null)
   const [saving, setSaving] = useState(false)
+  const [showApiKey, setShowApiKey] = useState(false)
   const hasLoadedConfig = useRef(false)
   const hasLoadedUpdateStatus = useRef(false)
 
@@ -431,14 +432,31 @@ export default function SettingsPage() {
                 <Label htmlFor="apiKey">
                   {t('settings.apiKey')} <span className="text-destructive">*</span>
                 </Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  value={currentApiKey}
-                  onChange={(e) => handleApiKeyChange(e.target.value)}
-                  placeholder={t('settings.apiKeyPlaceholder')}
-                  className="no-drag"
-                />
+                <div className="relative">
+                  <Input
+                    id="apiKey"
+                    type={showApiKey ? 'text' : 'password'}
+                    value={currentApiKey}
+                    onChange={(e) => handleApiKeyChange(e.target.value)}
+                    placeholder={t('settings.apiKeyPlaceholder')}
+                    className="no-drag pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 size-7 text-muted-foreground hover:text-foreground no-drag"
+                    onClick={() => setShowApiKey((v) => !v)}
+                    aria-label={showApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
+                    title={showApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
+                  >
+                    {showApiKey ? (
+                      <EyeOff className="size-4" aria-hidden />
+                    ) : (
+                      <Eye className="size-4" aria-hidden />
+                    )}
+                  </Button>
+                </div>
                 <p className="text-sm text-muted-foreground mr-1">
                   {t('settings.apiKeyHelp')}{' '}
                   <a

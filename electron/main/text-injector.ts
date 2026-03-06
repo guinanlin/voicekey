@@ -1,5 +1,9 @@
+import { execFile } from 'child_process'
+import { promisify } from 'util'
 import { clipboard, type NativeImage } from 'electron'
 import { keyboard, Key } from '@nut-tree-fork/nut-js'
+
+const execFileAsync = promisify(execFile)
 
 type ClipboardSnapshot = {
   text?: string
@@ -89,6 +93,8 @@ export class TextInjector {
    * Windows/Linux：使用剪贴板粘贴 (Ctrl+V)。
    * - keyboard.type() 模拟原始按键，不经过 IME，中文等 Unicode 会乱码。
    * - 剪贴板写入 UTF-8 文本再粘贴，可正确注入多语言内容。
+   * - Linux 注意：nut-js 依赖 X11 的键盘模拟；Wayland 下可能无法把按键送到目标窗口，
+   *   若注入无效可尝试在 X11 会话下运行，或使用「仅复制到剪贴板」再手动粘贴。
    * macOS：沿用 keyboard.type()（若遇中文乱码可后续改为剪贴板）。
    */
   private async typeTextInternal(text: string): Promise<void> {
@@ -145,11 +151,28 @@ export class TextInjector {
     clipboard.write(data)
   }
 
+  /**
+   * 使用 xdotool 发送粘贴（Linux/X11 专用）
+   * --clearmodifiers 在发键前强制清除所有持有的修饰键状态
+   * （解决右 Ctrl/右 Alt 等修饰键松开后 X11 状态残留导致 Ctrl+V 失效的问题）
+   */
+  private async tryXdotoolPaste(): Promise<boolean> {
+    try {
+      await execFileAsync('xdotool', ['key', '--clearmodifiers', 'ctrl+v'], { timeout: 2000 })
+      console.log('[TextInjector] xdotool paste succeeded')
+      return true
+    } catch (err) {
+      console.warn(
+        '[TextInjector] xdotool not available or failed:',
+        err instanceof Error ? err.message : err,
+      )
+      return false
+    }
+  }
+
   private async pasteFromClipboard(text: string): Promise<void> {
     const snapshot = this.captureClipboard()
     try {
-      // 写入剪贴板：Electron 的 clipboard.writeText() 自动处理 UTF-8 编码
-      // 在 Windows 上添加调试日志，确认文本编码正确
       if (process.platform === 'win32') {
         console.log('[TextInjector] Writing to clipboard (Windows):', {
           textLength: text.length,
@@ -158,7 +181,19 @@ export class TextInjector {
         })
       }
       clipboard.writeText(text)
-      await this.delay(50)
+      await this.delay(100)
+
+      if (process.platform === 'linux') {
+        // Linux/X11: 优先用 xdotool --clearmodifiers，消除修饰键残留状态
+        const ok = await this.tryXdotoolPaste()
+        if (ok) {
+          await this.delay(50)
+          return
+        }
+        // xdotool 不可用，回退到 nut-js
+        console.log('[TextInjector] Falling back to nut-js for paste')
+      }
+
       await keyboard.pressKey(Key.LeftControl, Key.V)
       await keyboard.releaseKey(Key.LeftControl, Key.V)
       await this.delay(50)

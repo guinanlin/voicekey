@@ -57,9 +57,6 @@ export class IOHookManager extends EventEmitter {
   }
 
   private handleInput(e: UiohookKeyboardEvent) {
-    // We strictly only case about keyboard events 4 (keydown) and 5 (keyup)
-    // The type definition might be different depending on version, usually 4=down, 5=up
-
     // uiohook-napi exposes e.type.
     // 4 = KeyPressed (KeyDown)
     // 5 = KeyReleased (KeyUp)
@@ -85,46 +82,36 @@ export class IOHookManager extends EventEmitter {
   }
 
   private checkHotkeys() {
-    // This is where we could trigger 'hotkey-down' events
-    // For PTT, we might want to let the main process handle the logic by querying checking state
-    // But emitting a specific event is cleaner.
-    // For now, we exposes an API to check if a specific combination is pressed.
+    // For PTT, the main process handles logic by querying isPressed().
   }
 
   /**
    * 检查指定的快捷键组合是否"当前正被按住"
    *
-   * 这是 PTT（Push-To-Talk）功能的核心状态检测器，用于判断录音何时开始、何时停止。
-   * 在 main.ts 的 checkPTT() 回调中被调用，每次键盘事件（keydown/keyup）都会触发检测。
+   * 严格匹配：左 Ctrl 与右 Ctrl 分别独立，互不替代。
+   * PTT 设为 "Control"  → 仅左 Ctrl 触发
+   * PTT 设为 "ControlRight" → 仅右 Ctrl 触发
    *
    * @param modifiers - 需要按住的修饰键数组，如 ['meta', 'shift']
-   * @param key - 需要按住的主键 keycode，如 UiohookKey.Space (57)
+   * @param key - 需要按住的主键 keycode
    * @returns true = 用户正在按住配置的快捷键组合；false = 未按住或已松开
-   *
-   * @example
-   * // 检查 Command+Space 是否被按住
-   * const isPressed = ioHookManager.isPressed(['meta'], UiohookKey.Space)
-   * if (isPressed) handleStartRecording()
-   * else handleStopRecording()
    */
   isPressed(modifiers: string[], key: number): boolean {
-    // 1. Check main key is pressed
+    // 1. 主键必须精确按下
     if (!this.pressedKeys.has(key)) return false
 
-    // 2. Check all required modifiers are pressed
+    // 2. 所有要求的修饰键必须按住
     for (const mod of modifiers) {
       if (!this.hasModifier(mod)) return false
     }
 
-    // 3. Check no extra modifiers are pressed (exact match)
-    // Get all keycodes that belong to the required modifiers
+    // 3. 不允许多余的修饰键（精确匹配）
+    // 注意：若主键本身是修饰键（如 CtrlRight），它在 ALL_MODIFIER_KEYS 中，
+    // 但由于 "if (pressedKey === key) continue" 会跳过，不会误判为"多余"
     const requiredModifierKeys = this.getRequiredModifierKeys(modifiers)
 
     for (const pressedKey of this.pressedKeys) {
-      // Skip the main key
       if (pressedKey === key) continue
-
-      // If a pressed key is a modifier key but NOT in the required set, reject
       if (ALL_MODIFIER_KEYS.has(pressedKey) && !requiredModifierKeys.has(pressedKey)) {
         return false
       }
@@ -152,7 +139,6 @@ export class IOHookManager extends EventEmitter {
     const modSet = MODIFIERS[mod.toUpperCase() as keyof typeof MODIFIERS]
     if (!modSet) return false
 
-    // Check if any key in the modifier set is pressed
     for (const key of modSet) {
       if (this.pressedKeys.has(key)) return true
     }

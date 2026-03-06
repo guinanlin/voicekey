@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -82,7 +82,16 @@ export function HotkeyRecorder({
       }
 
       if (pressedKeysRef.current.size > 0) {
-        const modifiers = ['Command', 'Control', 'Alt', 'Shift']
+        const modifiers = [
+          'Command',
+          'CommandRight',
+          'Control',
+          'ControlRight',
+          'Alt',
+          'AltRight',
+          'Shift',
+          'ShiftRight',
+        ]
         const keysArray = [...pressedKeysRef.current]
         const mainKeyCount = keysArray.filter((k) => !modifiers.includes(k)).length
 

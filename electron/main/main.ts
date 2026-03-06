@@ -14,6 +14,10 @@ import fs from 'fs'
 // 若本机 GPU 正常且无报错，可注释掉以下两行
 app.commandLine.appendSwitch('disable-gpu')
 app.commandLine.appendSwitch('disable-gpu-sandbox')
+// Linux Wayland：启用 Portal 以支持全局快捷键（否则 globalShortcut 可能无效）
+if (process.platform === 'linux' && process.env.XDG_SESSION_TYPE === 'wayland') {
+  app.commandLine.appendSwitch('enable-features', 'GlobalShortcutsPortal')
+}
 import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
@@ -333,14 +337,26 @@ function parseAccelerator(accelerator: string): { modifiers: string[]; key: numb
     if (lowerKey === 'command' || lowerKey === 'cmd' || lowerKey === 'meta') {
       return { modifiers: [], key: UiohookKey.Meta }
     }
+    if (lowerKey === 'commandright') {
+      return { modifiers: [], key: UiohookKey.MetaRight }
+    }
     if (lowerKey === 'control' || lowerKey === 'ctrl') {
       return { modifiers: [], key: UiohookKey.Ctrl }
+    }
+    if (lowerKey === 'controlright') {
+      return { modifiers: [], key: UiohookKey.CtrlRight }
     }
     if (lowerKey === 'alt' || lowerKey === 'option') {
       return { modifiers: [], key: UiohookKey.Alt }
     }
+    if (lowerKey === 'altright') {
+      return { modifiers: [], key: UiohookKey.AltRight }
+    }
     if (lowerKey === 'shift') {
       return { modifiers: [], key: UiohookKey.Shift }
+    }
+    if (lowerKey === 'shiftright') {
+      return { modifiers: [], key: UiohookKey.ShiftRight }
     }
   }
 

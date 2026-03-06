@@ -198,7 +198,7 @@ export function HotkeySettings() {
                 </SelectTrigger>
                 <SelectContent>
                   {filteredPresets.map((preset) => (
-                    <SelectItem key={preset.value} value={preset.value}>
+                    <SelectItem key={`${preset.value}-${preset.platform}`} value={preset.value}>
                       {t(preset.labelKey)}
                     </SelectItem>
                   ))}
