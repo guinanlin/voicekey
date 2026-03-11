@@ -213,7 +213,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mac-artifacts-${{ matrix.arch }}
-          path: release/**/Voice*-Mac-*.zip
+          path: |
+            release/**/Voice*-Mac-*.zip
+            release/**/latest-mac.yml
+            release/**/*.blockmap
           if-no-files-found: error
 
   # 3. 构建 Windows
@@ -242,7 +245,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: win-artifacts
-          path: release/**/Voice*-Windows-*-Setup.exe
+          path: |
+            release/**/Voice*-Windows-*-Setup.exe
+            release/**/latest.yml
+            release/**/*.blockmap
           if-no-files-found: error
 
   # 4. 构建 Linux（仅新增，不改动 build-mac / build-win）
@@ -308,6 +314,9 @@ jobs:
             artifacts/**/Voice*-Mac-*.zip
             artifacts/**/Voice*-Windows-*-Setup.exe
             artifacts/**/Voice*-Linux-*.deb
+            artifacts/**/latest.yml
+            artifacts/**/latest-mac.yml
+            artifacts/**/*.blockmap
           body: |
             ## 🎉 新版本发布！
 

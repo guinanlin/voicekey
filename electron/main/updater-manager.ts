@@ -184,9 +184,8 @@ export class UpdaterManager {
       console.log('[Updater] Checking for updates using electron-updater...')
       console.log('[Updater] Current version:', app.getVersion())
 
-      // 使用 electron-updater 检查更新
-      const result = await autoUpdater.checkForUpdates()
-      console.log('[Updater] Check result:', result)
+      // 打包版本必须使用 electron-updater 事件链，不再回退到 GitHub API
+      await autoUpdater.checkForUpdates()
 
       // 等待一小段时间，让事件处理器有机会更新 lastUpdateInfo
       await new Promise((resolve) => setTimeout(resolve, 500))
@@ -197,13 +196,32 @@ export class UpdaterManager {
         return UpdaterManager.lastUpdateInfo
       }
 
-      // 如果没有收到事件，回退到 GitHub API
-      console.log('[Updater] No update event received, falling back to GitHub API')
-      return await UpdaterManager.checkForUpdatesViaAPI()
+      // 异常情况：未收到事件，按错误处理
+      const info: UpdateInfo = {
+        hasUpdate: false,
+        latestVersion: '',
+        releaseUrl: UpdaterManager.getDefaultReleaseUrl(),
+        releaseNotes: '',
+        error: 'No update event received from electron-updater',
+        status: 'error',
+      }
+      UpdaterManager.lastUpdateInfo = info
+      return info
     } catch (error) {
       console.error('[Updater] electron-updater failed:', error)
-      // 如果 electron-updater 失败，回退到 GitHub API
-      return await UpdaterManager.checkForUpdatesViaAPI()
+      const info: UpdateInfo = {
+        hasUpdate: false,
+        latestVersion: '',
+        releaseUrl: UpdaterManager.getDefaultReleaseUrl(),
+        releaseNotes: '',
+        error:
+          error instanceof Error
+            ? `electron-updater check failed: ${error.message}`
+            : 'electron-updater check failed',
+        status: 'error',
+      }
+      UpdaterManager.lastUpdateInfo = info
+      return info
     }
   }
 
