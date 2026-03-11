@@ -609,7 +609,9 @@ function convertToMP3(inputPath: string, outputPath: string): Promise<void> {
     ffmpeg(inputPath)
       .toFormat('mp3')
       .audioCodec('libmp3lame')
-      .audioBitrate('128k')
+      .audioFrequency(16000)
+      .audioChannels(1)
+      .audioBitrate('64k')
       .on('end', () => {
         const conversionDuration = Date.now() - conversionStartTime
         console.log(`[Main] [${new Date().toISOString()}] Audio conversion completed`)
