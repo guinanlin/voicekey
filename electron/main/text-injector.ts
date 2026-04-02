@@ -117,6 +117,51 @@ export class TextInjector {
   }
 
   /**
+   * Linux/X11：`after_key` 与粘贴同源走 xdotool，避免 nut-js 按键送不到前台窗口而粘贴已成功的情况。
+   */
+  private async tryXdotoolAfterKey(afterKey: string): Promise<boolean> {
+    const lower = afterKey.toLowerCase().trim()
+    let spec: string | null = null
+    if (lower === 'ctrl_enter') {
+      spec = 'ctrl+Return'
+    } else {
+      const map: Record<string, string> = {
+        enter: 'Return',
+        tab: 'Tab',
+        backspace: 'BackSpace',
+        esc: 'Escape',
+        escape: 'Escape',
+        space: 'space',
+        up: 'Up',
+        down: 'Down',
+        left: 'Left',
+        right: 'Right',
+        home: 'Home',
+        end: 'End',
+        pageup: 'Page_Up',
+        pagedown: 'Page_Down',
+        delete: 'Delete',
+        insert: 'Insert',
+      }
+      spec = map[lower] ?? null
+    }
+    if (!spec) {
+      return false
+    }
+    try {
+      await execFileAsync('xdotool', ['key', '--clearmodifiers', spec], { timeout: 2000 })
+      console.log(`[TextInjector] xdotool after_key succeeded (${spec})`)
+      return true
+    } catch (err) {
+      console.warn(
+        '[TextInjector] xdotool after_key failed:',
+        err instanceof Error ? err.message : err,
+      )
+      return false
+    }
+  }
+
+  /**
    * Win/Linux：写入剪贴板并粘贴；不快照、不恢复，完成后剪贴板即为本次文本。
    */
   private async pasteFromClipboard(text: string): Promise<void> {
@@ -234,11 +279,17 @@ export class TextInjector {
         const key = this.stringToKey(afterKey)
         if (key) {
           await this.delay(50) // 等待输入完成
-          if (Array.isArray(key)) {
-            await keyboard.pressKey(...key)
-            await keyboard.releaseKey(...key)
-          } else {
-            await this.pressKey(key)
+          let usedXdotoolAfterKey = false
+          if (process.platform === 'linux') {
+            usedXdotoolAfterKey = await this.tryXdotoolAfterKey(afterKey)
+          }
+          if (!usedXdotoolAfterKey) {
+            if (Array.isArray(key)) {
+              await keyboard.pressKey(...key)
+              await keyboard.releaseKey(...key)
+            } else {
+              await this.pressKey(key)
+            }
           }
         } else {
           console.warn(`[TextInjector] Unknown afterKey: ${afterKey}`)
