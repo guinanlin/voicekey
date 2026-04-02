@@ -1,7 +1,7 @@
 {
   "name": "voice-key",
   "private": true,
-  "version": "0.2.23",
+  "version": "0.2.24",
   "description": "Desktop voice-to-text input app with GLM ASR integration.",
   "author": "guinanlin <guinanlin@users.noreply.github.com>",
   "productName": "Voice Key",
