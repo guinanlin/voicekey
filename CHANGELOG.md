@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.28](https://github.com/guinanlin/voicekey/compare/v0.2.26...v0.2.28) (2026-04-02)
+
+### Features
+
+- **electron:** add Qwen DashScope ASR with ERPNextCN upload ([2a779be](https://github.com/guinanlin/voicekey/commit/2a779be4c3e0ca196eb300e83ef1c86ed7b52a76))
+
 ### [0.2.27](https://github.com/guinanlin/voicekey/compare/v0.2.26...v0.2.27) (2026-04-02)
 
 ### [0.2.26](https://github.com/guinanlin/voicekey/compare/v0.2.23...v0.2.26) (2026-04-02)
