@@ -18,25 +18,8 @@ export class TextInjector {
     }
 
     try {
-      console.log('[TextInjector] Text to inject:', text)
-      console.log('[TextInjector] Text bytes:', Buffer.from(text).toString('hex'))
-      console.log('[TextInjector] Text length:', text.length)
-
-      const delayStartTime = Date.now()
       await this.delay(100)
-      const delayDuration = Date.now() - delayStartTime
-      console.log(`[TextInjector] ⏱️  Pre-injection delay took ${delayDuration}ms`)
-
-      const typingStartTime = Date.now()
-      console.log(`[TextInjector] [${new Date().toISOString()}] Starting text injection...`)
       await this.typeTextInternal(text)
-      const typingDuration = Date.now() - typingStartTime
-      console.log(`[TextInjector] [${new Date().toISOString()}] Text injection completed`)
-      console.log(`[TextInjector] ⏱️  Keyboard typing took ${typingDuration}ms`)
-
-      const totalDuration = Date.now() - injectStartTime
-      console.log(`[TextInjector] ⏱️  Total injectText() took ${totalDuration}ms`)
-      console.log('[TextInjector] Text injected successfully')
     } catch (error) {
       const errorDuration = Date.now() - injectStartTime
       console.error(`[TextInjector] Failed to inject text after ${errorDuration}ms:`, error)
@@ -105,7 +88,6 @@ export class TextInjector {
   private async tryXdotoolPaste(): Promise<boolean> {
     try {
       await execFileAsync('xdotool', ['key', '--clearmodifiers', 'ctrl+v'], { timeout: 2000 })
-      console.log('[TextInjector] xdotool paste succeeded')
       return true
     } catch (err) {
       console.warn(
@@ -149,8 +131,12 @@ export class TextInjector {
       return false
     }
     try {
-      await execFileAsync('xdotool', ['key', '--clearmodifiers', spec], { timeout: 2000 })
-      console.log(`[TextInjector] xdotool after_key succeeded (${spec})`)
+      // 粘贴后部分应用尚未处理完 Ctrl+V，立即发 Return 会丢键；用 xdotool 内建 sleep 再发键，避免与 injectText 的时序竞态
+      const needsPasteSettle = spec === 'Return' || spec === 'ctrl+Return'
+      const xdotoolArgs = needsPasteSettle
+        ? (['sleep', '0.18', 'key', '--clearmodifiers', spec] as const)
+        : (['key', '--clearmodifiers', spec] as const)
+      await execFileAsync('xdotool', [...xdotoolArgs], { timeout: needsPasteSettle ? 4000 : 2000 })
       return true
     } catch (err) {
       console.warn(
@@ -165,13 +151,6 @@ export class TextInjector {
    * Win/Linux：写入剪贴板并粘贴；不快照、不恢复，完成后剪贴板即为本次文本。
    */
   private async pasteFromClipboard(text: string): Promise<void> {
-    if (process.platform === 'win32') {
-      console.log('[TextInjector] Writing to clipboard (Windows):', {
-        textLength: text.length,
-        firstChars: text.substring(0, 20),
-        textBytes: Buffer.from(text, 'utf8').toString('hex').substring(0, 40),
-      })
-    }
     clipboard.writeText(text)
     await this.delay(100)
 
@@ -278,7 +257,9 @@ export class TextInjector {
       if (afterKey) {
         const key = this.stringToKey(afterKey)
         if (key) {
-          await this.delay(50) // 等待输入完成
+          // Linux：剪贴板粘贴后多等一帧，减少与 xdotool after_key 的竞态（去掉调试埋点后仅 50ms 时易复现）
+          const preKeyMs = process.platform === 'linux' ? 120 : 50
+          await this.delay(preKeyMs)
           let usedXdotoolAfterKey = false
           if (process.platform === 'linux') {
             usedXdotoolAfterKey = await this.tryXdotoolAfterKey(afterKey)
