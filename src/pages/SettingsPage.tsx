@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CheckCircle2, XCircle, AlertTriangle, Eye, EyeOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { DASHSCOPE, ERPNEXTCN_DTY } from '@electron/shared/constants'
 import { resolveLanguage, type LanguageSetting } from '@electron/shared/i18n'
 import type { AppConfig, UpdateInfo } from '@electron/shared/types'
 import { HotkeySettings } from '@/components/HotkeySettings'
@@ -34,10 +35,16 @@ export default function SettingsPage() {
       },
       endpoint: '',
       language: 'auto',
+      qwenApiKey: '',
+      qwenRegion: 'cn',
     },
     hotkey: {
       pttKey: '',
       toggleSettings: '',
+    },
+    erpnextcnDty: {
+      host: '',
+      apiKey: '',
     },
   })
 
@@ -48,6 +55,8 @@ export default function SettingsPage() {
   } | null>(null)
   const [saving, setSaving] = useState(false)
   const [showApiKey, setShowApiKey] = useState(false)
+  const [showErpnextcnKey, setShowErpnextcnKey] = useState(false)
+  const [showQwenApiKey, setShowQwenApiKey] = useState(false)
   const hasLoadedConfig = useRef(false)
   const hasLoadedUpdateStatus = useRef(false)
 
@@ -100,6 +109,7 @@ export default function SettingsPage() {
         ...latestConfig,
         app: config.app,
         asr: config.asr,
+        erpnextcnDty: config.erpnextcnDty,
       })
 
       setTestResult({ type: 'success', message: t('settings.result.saveSuccess') })
@@ -115,13 +125,19 @@ export default function SettingsPage() {
   }
 
   const handleTestConnection = async () => {
-    // Validate key for current region
-    const region = config.asr.region || 'cn'
-    const apiKey = config.asr.apiKeys[region]
-
-    if (!apiKey) {
-      setTestResult({ type: 'error', message: t('settings.result.apiKeyRequired') })
-      return
+    if (config.asr.provider === 'qwen') {
+      const qk = config.asr.qwenApiKey?.trim() ?? ''
+      if (!qk) {
+        setTestResult({ type: 'error', message: t('settings.result.qwenApiKeyRequired') })
+        return
+      }
+    } else {
+      const region = config.asr.region || 'cn'
+      const apiKey = config.asr.apiKeys[region]
+      if (!apiKey) {
+        setTestResult({ type: 'error', message: t('settings.result.apiKeyRequired') })
+        return
+      }
     }
 
     setTesting(true)
@@ -177,6 +193,9 @@ export default function SettingsPage() {
 
   const currentRegion = config.asr.region || 'cn'
   const currentApiKey = config.asr.apiKeys?.[currentRegion] || ''
+  const qwenDashscopeSubmitUrl = `${
+    config.asr.qwenRegion === 'intl' ? DASHSCOPE.BASE_INTL : DASHSCOPE.BASE_CN
+  }/api/v1/services/audio/asr/transcription`
 
   // Update Logic
   const [checkingUpdate, setCheckingUpdate] = useState(false)
@@ -341,34 +360,41 @@ export default function SettingsPage() {
   return (
     <div className="flex max-w-4xl flex-col gap-5">
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="h-8 bg-muted/50 p-0.5 rounded-md">
+        {/* 横向小标签，宽度随内容；左对齐（self-start），不撑满整行 */}
+        <TabsList className="inline-flex h-auto min-h-8 w-fit max-w-full flex-wrap items-center justify-start gap-0.5 self-start rounded-md bg-muted/50 p-0.5">
           <TabsTrigger
             value="general"
-            className="px-3 py-1 text-xs h-7 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="h-7 flex-none px-3 py-1 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
             {t('settings.appPreferences')}
           </TabsTrigger>
           <TabsTrigger
-            value="asr"
-            className="px-3 py-1 text-xs h-7 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            value="llm"
+            className="h-7 flex-none px-3 py-1 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
-            {t('settings.asrConfig')}
+            {t('settings.bigModelTab')}
+          </TabsTrigger>
+          <TabsTrigger
+            value="storage"
+            className="h-7 flex-none px-3 py-1 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            {t('settings.storageTab')}
           </TabsTrigger>
           <TabsTrigger
             value="hotkeys"
-            className="px-3 py-1 text-xs h-7 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="h-7 flex-none px-3 py-1 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
             {t('hotkey.title')}
           </TabsTrigger>
           <TabsTrigger
             value="about"
-            className="px-3 py-1 text-xs h-7 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="h-7 flex-none px-3 py-1 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
             {t('settings.about')}
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="space-y-6 mt-6">
+        <TabsContent value="general" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-xl font-bold">{t('settings.appPreferences')}</CardTitle>
@@ -409,100 +435,287 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="asr" className="space-y-6 mt-6">
+        <TabsContent value="llm" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl font-bold">{t('settings.asrConfig')}</CardTitle>
+              <CardTitle className="text-xl font-bold">{t('settings.asrBackendTitle')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="region">{t('settings.region')}</Label>
-                <Select value={currentRegion} onValueChange={handleRegionChange}>
-                  <SelectTrigger id="region" className="no-drag w-full cursor-pointer">
+                <Label htmlFor="asrProvider">{t('settings.asrBackendLabel')}</Label>
+                <Select
+                  value={config.asr.provider}
+                  onValueChange={(value) =>
+                    setConfig((prev) => ({
+                      ...prev,
+                      asr: {
+                        ...prev.asr,
+                        provider: value as 'glm' | 'qwen',
+                      },
+                    }))
+                  }
+                >
+                  <SelectTrigger id="asrProvider" className="no-drag w-full cursor-pointer">
                     <SelectValue placeholder={t('settings.languagePlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cn">{t('settings.regionChina')}</SelectItem>
-                    <SelectItem value="intl">{t('settings.regionIntl')}</SelectItem>
+                    <SelectItem value="glm">{t('settings.asrBackendGlm')}</SelectItem>
+                    <SelectItem value="qwen">{t('settings.asrBackendQwen')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+            </CardContent>
+          </Card>
 
+          {config.asr.provider === 'glm' ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl font-bold">{t('settings.glmAsrCardTitle')}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="region">{t('settings.region')}</Label>
+                  <Select value={currentRegion} onValueChange={handleRegionChange}>
+                    <SelectTrigger id="region" className="no-drag w-full cursor-pointer">
+                      <SelectValue placeholder={t('settings.languagePlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cn">{t('settings.regionChina')}</SelectItem>
+                      <SelectItem value="intl">{t('settings.regionIntl')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="apiKey">
+                    {t('settings.apiKey')} <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="apiKey"
+                      type={showApiKey ? 'text' : 'password'}
+                      value={currentApiKey}
+                      onChange={(e) => handleApiKeyChange(e.target.value)}
+                      placeholder={t('settings.apiKeyPlaceholder')}
+                      className="no-drag pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 size-7 text-muted-foreground hover:text-foreground no-drag"
+                      onClick={() => setShowApiKey((v) => !v)}
+                      aria-label={showApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
+                      title={showApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
+                    >
+                      {showApiKey ? (
+                        <EyeOff className="size-4" aria-hidden />
+                      ) : (
+                        <Eye className="size-4" aria-hidden />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground mr-1">
+                    {t('settings.apiKeyHelp')}{' '}
+                    <a
+                      href={
+                        currentRegion === 'intl'
+                          ? 'https://z.ai/manage-apikey/apikey-list'
+                          : 'https://bigmodel.cn/usercenter/proj-mgmt/apikeys'
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {currentRegion === 'intl' ? 'z.ai' : 'bigmodel.cn'}
+                    </a>
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="endpoint">{t('settings.apiEndpoint')}</Label>
+                  <Input
+                    id="endpoint"
+                    type="text"
+                    value={
+                      config.asr.endpoint ||
+                      (currentRegion === 'intl'
+                        ? 'https://api.z.ai/api/paas/v4/audio/transcriptions'
+                        : 'https://open.bigmodel.cn/api/paas/v4/audio/transcriptions')
+                    }
+                    readOnly
+                    disabled
+                    className="no-drag bg-muted text-muted-foreground"
+                  />
+                  <div className="flex items-center space-x-2 mt-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                    <p className="text-sm text-muted-foreground">{t('settings.durationWarning')}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {config.asr.provider === 'qwen' ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl font-bold">
+                  {t('settings.qwenAsrCardTitle')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Alert className="border-muted-foreground/25 bg-muted/40">
+                  <AlertDescription className="text-sm text-muted-foreground">
+                    {t('settings.qwenAsrHint')}
+                  </AlertDescription>
+                </Alert>
+                <div className="space-y-2">
+                  <Label htmlFor="qwenRegion">{t('settings.qwenDashscopeRegion')}</Label>
+                  <Select
+                    value={config.asr.qwenRegion === 'intl' ? 'intl' : 'cn'}
+                    onValueChange={(value) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        asr: {
+                          ...prev.asr,
+                          qwenRegion: value as 'cn' | 'intl',
+                        },
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="qwenRegion" className="no-drag w-full cursor-pointer">
+                      <SelectValue placeholder={t('settings.languagePlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cn">{t('settings.qwenRegionCn')}</SelectItem>
+                      <SelectItem value="intl">{t('settings.qwenRegionIntl')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="qwenSubmitUrl">{t('settings.qwenSubmitEndpoint')}</Label>
+                  <Input
+                    id="qwenSubmitUrl"
+                    type="text"
+                    value={qwenDashscopeSubmitUrl}
+                    readOnly
+                    disabled
+                    className="no-drag bg-muted text-muted-foreground"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings.qwenModelLabel')}: {DASHSCOPE.QWEN_ASR_MODEL}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="qwenApiKey">{t('settings.qwenApiKey')}</Label>
+                  <div className="relative">
+                    <Input
+                      id="qwenApiKey"
+                      type={showQwenApiKey ? 'text' : 'password'}
+                      value={config.asr.qwenApiKey ?? ''}
+                      onChange={(e) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          asr: { ...prev.asr, qwenApiKey: e.target.value },
+                        }))
+                      }
+                      placeholder={t('settings.qwenApiKeyPlaceholder')}
+                      className="no-drag pr-10"
+                      autoComplete="off"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 size-7 text-muted-foreground hover:text-foreground no-drag"
+                      onClick={() => setShowQwenApiKey((v) => !v)}
+                      aria-label={
+                        showQwenApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')
+                      }
+                      title={showQwenApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
+                    >
+                      {showQwenApiKey ? (
+                        <EyeOff className="size-4" aria-hidden />
+                      ) : (
+                        <Eye className="size-4" aria-hidden />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="storage" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl font-bold">{t('settings.erpnextcnTitle')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">{t('settings.erpnextcnHelp')}</p>
               <div className="space-y-2">
-                <Label htmlFor="apiKey">
-                  {t('settings.apiKey')} <span className="text-destructive">*</span>
-                </Label>
+                <Label htmlFor="erpnextcnHost">{t('settings.erpnextcnHost')}</Label>
+                <Input
+                  id="erpnextcnHost"
+                  type="url"
+                  value={config.erpnextcnDty.host}
+                  onChange={(e) =>
+                    setConfig((prev) => ({
+                      ...prev,
+                      erpnextcnDty: { ...prev.erpnextcnDty, host: e.target.value },
+                    }))
+                  }
+                  placeholder={ERPNEXTCN_DTY.DEFAULT_HOST}
+                  className="no-drag"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="erpnextcnApiKey">{t('settings.erpnextcnApiKey')}</Label>
                 <div className="relative">
                   <Input
-                    id="apiKey"
-                    type={showApiKey ? 'text' : 'password'}
-                    value={currentApiKey}
-                    onChange={(e) => handleApiKeyChange(e.target.value)}
-                    placeholder={t('settings.apiKeyPlaceholder')}
+                    id="erpnextcnApiKey"
+                    type={showErpnextcnKey ? 'text' : 'password'}
+                    value={config.erpnextcnDty.apiKey}
+                    onChange={(e) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        erpnextcnDty: { ...prev.erpnextcnDty, apiKey: e.target.value },
+                      }))
+                    }
+                    placeholder={t('settings.erpnextcnApiKeyPlaceholder')}
                     className="no-drag pr-10"
+                    autoComplete="off"
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
                     className="absolute right-1 top-1/2 -translate-y-1/2 size-7 text-muted-foreground hover:text-foreground no-drag"
-                    onClick={() => setShowApiKey((v) => !v)}
-                    aria-label={showApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
-                    title={showApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
+                    onClick={() => setShowErpnextcnKey((v) => !v)}
+                    aria-label={
+                      showErpnextcnKey ? t('settings.hideApiKey') : t('settings.showApiKey')
+                    }
+                    title={showErpnextcnKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
                   >
-                    {showApiKey ? (
+                    {showErpnextcnKey ? (
                       <EyeOff className="size-4" aria-hidden />
                     ) : (
                       <Eye className="size-4" aria-hidden />
                     )}
                   </Button>
                 </div>
-                <p className="text-sm text-muted-foreground mr-1">
-                  {t('settings.apiKeyHelp')}{' '}
-                  <a
-                    href={
-                      currentRegion === 'intl'
-                        ? 'https://z.ai/manage-apikey/apikey-list'
-                        : 'https://bigmodel.cn/usercenter/proj-mgmt/apikeys'
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    {currentRegion === 'intl' ? 'z.ai' : 'bigmodel.cn'}
-                  </a>
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="endpoint">{t('settings.apiEndpoint')}</Label>
-                <Input
-                  id="endpoint"
-                  type="text"
-                  value={
-                    config.asr.endpoint ||
-                    (currentRegion === 'intl'
-                      ? 'https://api.z.ai/api/paas/v4/audio/transcriptions'
-                      : 'https://open.bigmodel.cn/api/paas/v4/audio/transcriptions')
-                  }
-                  readOnly
-                  disabled
-                  className="no-drag bg-muted text-muted-foreground"
-                />
-                <div className="flex items-center space-x-2 mt-2">
-                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                  <p className="text-sm text-muted-foreground">{t('settings.durationWarning')}</p>
-                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="hotkeys" className="space-y-6 mt-6">
+        <TabsContent value="hotkeys" className="mt-6 space-y-6">
           <HotkeySettings />
         </TabsContent>
 
-        <TabsContent value="about" className="space-y-6 mt-6">
+        <TabsContent value="about" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-xl font-bold">{t('settings.about')}</CardTitle>
@@ -630,7 +843,10 @@ export default function SettingsPage() {
         <Button
           variant="secondary"
           onClick={handleTestConnection}
-          disabled={testing || !currentApiKey}
+          disabled={
+            testing ||
+            (config.asr.provider === 'qwen' ? !config.asr.qwenApiKey?.trim() : !currentApiKey)
+          }
           className="no-drag flex-1 cursor-pointer"
         >
           {testing ? t('settings.testingConnection') : t('settings.testConnection')}

@@ -7,6 +7,7 @@ export function HUD() {
   const { t } = useTranslation()
   const [status, setStatus] = useState<OverlayStatus>('recording')
   const [message, setMessage] = useState<string>('')
+  const [noTextInjected, setNoTextInjected] = useState(false)
   const [audioLevel, setAudioLevel] = useState(0)
   const [isVisible, setIsVisible] = useState(false)
 
@@ -29,6 +30,7 @@ export function HUD() {
       (state: OverlayState) => {
         setStatus(state.status)
         setMessage(state.message ?? '')
+        setNoTextInjected(state.noTextInjected ?? false)
       },
     )
 
@@ -210,10 +212,12 @@ export function HUD() {
                 <span className="text-sm font-medium text-white line-clamp-1 max-w-[180px]">
                   {message || t('hud.done')}
                 </span>
-                <div className="flex items-center text-[10px] text-emerald-400 font-medium bg-emerald-400/10 px-1.5 py-0.5 rounded">
-                  <Sparkles className="w-3 h-3 mr-1" />
-                  <span>{t('hud.injected')}</span>
-                </div>
+                {!noTextInjected && (
+                  <div className="flex items-center text-[10px] text-emerald-400 font-medium bg-emerald-400/10 px-1.5 py-0.5 rounded">
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    <span>{t('hud.injected')}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -25,6 +25,8 @@ import { fileURLToPath } from 'node:url'
 import { UiohookKey } from 'uiohook-napi'
 import { ASRProvider } from './asr-provider'
 import { configManager } from './config-manager'
+import { fileUrlFromErpnextUploadResponse, uploadErpnextcnDtyMp3 } from './erpnextcn-upload'
+import { testQwenDashScopeConnection, transcribeQwenFromFileUrl } from './qwen-asr-provider'
 import { historyManager } from './history-manager'
 import { hotkeyManager } from './hotkey-manager'
 import { initMainI18n, setMainLanguage, t } from './i18n'
@@ -96,6 +98,8 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
+      // 隐藏窗口默认会 background 节流，易导致 MediaRecorder 几乎不产出数据（仅几十字节 webm）
+      backgroundThrottling: false,
     },
   })
 
@@ -307,9 +311,13 @@ function createTray() {
   })
 }
 
-// 初始化ASR Provider
+// 初始化 GLM ASR Provider（选用千问时不实例化，避免无谓失败）
 function initializeASRProvider() {
   const config = configManager.getASRConfig()
+  if (config.provider !== 'glm') {
+    asrProvider = null
+    return
+  }
   asrProvider = new ASRProvider(config)
 }
 
@@ -643,6 +651,15 @@ async function handleAudioData(buffer: Buffer) {
     console.log(
       `[Main] [${new Date().toISOString()}] Received audio data size: ${buffer.length} bytes`,
     )
+    const MIN_VALID_AUDIO_BYTES = 512
+    if (buffer.length < MIN_VALID_AUDIO_BYTES) {
+      throw new Error(t('errors.recordingDataMissing'))
+    }
+    if (buffer.length < 4000) {
+      console.warn(
+        `[Main] Audio buffer is very small (${buffer.length} bytes); recording may be silent or incomplete. Check mic and MediaRecorder.`,
+      )
+    }
 
     const saveStartTime = Date.now()
     console.log(
@@ -658,19 +675,64 @@ async function handleAudioData(buffer: Buffer) {
     console.log(`[Main] [${new Date().toISOString()}] Audio converted to MP3: ${tempMp3Path}`)
     console.log(`[Main] ⏱️  Total conversion process took ${conversionDuration}ms`)
 
-    if (!asrProvider) {
-      const initStartTime = Date.now()
-      console.log(`[Main] [${new Date().toISOString()}] Initializing ASR provider...`)
-      initializeASRProvider()
-      if (!asrProvider) throw new Error('ASR Provider initialization failed')
-      const initDuration = Date.now() - initStartTime
-      console.log(`[Main] ⏱️  ASR initialization took ${initDuration}ms`)
+    const asrCfg = configManager.getASRConfig()
+    let asrDuration = 0
+    let transcription: Awaited<ReturnType<ASRProvider['transcribe']>>
+
+    if (asrCfg.provider === 'qwen') {
+      const erpResolved = configManager.getErpnextcnDtyResolvedForUpload()
+      if (!erpResolved.apiKey.trim()) {
+        throw new Error(t('errors.qwenNeedsErpnextUpload'))
+      }
+      const asrStartTime = Date.now()
+      console.log(
+        `[Main] [${new Date().toISOString()}] Qwen: ERPNextCN upload (required) then DashScope...`,
+      )
+      const uploadData = await uploadErpnextcnDtyMp3(tempMp3Path, erpResolved)
+      if (uploadData === null) {
+        throw new Error(t('errors.qwenNeedsErpnextUpload'))
+      }
+      const publicUrl = fileUrlFromErpnextUploadResponse(uploadData)
+      if (!publicUrl) {
+        throw new Error(t('errors.qwenFileUrlMissing'))
+      }
+      try {
+        transcription = await transcribeQwenFromFileUrl(asrCfg, publicUrl)
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err)
+        throw new Error(t('errors.qwenTranscriptionFailed', { message: detail }))
+      }
+      asrDuration = Date.now() - asrStartTime
+    } else {
+      if (!asrProvider) {
+        const initStartTime = Date.now()
+        console.log(`[Main] [${new Date().toISOString()}] Initializing ASR provider...`)
+        initializeASRProvider()
+        if (!asrProvider) throw new Error('ASR Provider initialization failed')
+        const initDuration = Date.now() - initStartTime
+        console.log(`[Main] ⏱️  ASR initialization took ${initDuration}ms`)
+      }
+
+      const erpResolved = configManager.getErpnextcnDtyResolvedForUpload()
+      const asrStartTime = Date.now()
+      console.log(`[Main] [${new Date().toISOString()}] Parallel: ERPNextCN upload + ASR...`)
+
+      const glmAsr = asrProvider
+      if (!glmAsr) throw new Error('ASR Provider initialization failed')
+
+      transcription = await Promise.all([
+        uploadErpnextcnDtyMp3(tempMp3Path, erpResolved).catch((err: unknown) => {
+          console.error('[Main] ERPNextCN upload failed (ignored for ASR/history):', err)
+          return null
+        }),
+        (async () => {
+          const tr = await glmAsr.transcribe(tempMp3Path)
+          asrDuration = Date.now() - asrStartTime
+          return tr
+        })(),
+      ]).then(([, tr]) => tr)
     }
 
-    const asrStartTime = Date.now()
-    console.log(`[Main] [${new Date().toISOString()}] Sending audio to ASR service...`)
-    const transcription = await asrProvider.transcribe(tempMp3Path)
-    const asrDuration = Date.now() - asrStartTime
     console.log(`[Main] [${new Date().toISOString()}] Transcription received`)
     console.log(`[Main] ⏱️  ASR transcription took ${asrDuration}ms`)
     console.log(
@@ -682,18 +744,29 @@ async function handleAudioData(buffer: Buffer) {
     currentSession.transcription = transcription.text
     currentSession.status = 'completed'
 
-    historyManager.add({
-      text: transcription.text,
-      duration: currentSession.duration,
-    })
+    const trimmedText = transcription.text.trim()
+    let injectDuration = 0
+    if (trimmedText.length > 0) {
+      historyManager.add({
+        text: transcription.text,
+        duration: currentSession.duration,
+      })
 
-    const injectStartTime = Date.now()
-    console.log(`[Main] [${new Date().toISOString()}] Injecting text...`)
-    await textInjector.injectText(transcription.text)
-    const injectDuration = Date.now() - injectStartTime
-    console.log(`[Main] ⏱️  Text injection took ${injectDuration}ms`)
+      const injectStartTime = Date.now()
+      console.log(`[Main] [${new Date().toISOString()}] Injecting text...`)
+      await textInjector.injectText(transcription.text)
+      injectDuration = Date.now() - injectStartTime
+      console.log(`[Main] ⏱️  Text injection took ${injectDuration}ms`)
 
-    updateOverlay({ status: 'success' })
+      updateOverlay({ status: 'success' })
+    } else {
+      console.warn('[Main] ASR returned empty text; no injection or history entry')
+      updateOverlay({
+        status: 'success',
+        message: t('errors.emptyTranscription'),
+        noTextInjected: true,
+      })
+    }
     setTimeout(() => hideOverlay(), 800)
 
     const cleanupStartTime = Date.now()
@@ -784,11 +857,18 @@ function setupIPCHandlers() {
       registerGlobalHotkeys()
       console.log('[Main] Hotkeys re-registered with new config:', config.hotkey)
     }
+    if (config.erpnextcnDty) {
+      configManager.setErpnextcnDtyConfig(config.erpnextcnDty)
+    }
   })
 
   ipcMain.handle(IPC_CHANNELS.CONFIG_TEST, async (_event, config?: ASRConfig) => {
+    const cfg = config ?? configManager.getASRConfig()
+    if (cfg.provider === 'qwen') {
+      return await testQwenDashScopeConnection(cfg)
+    }
     if (config) {
-      const tempProvider = new ASRProvider(config)
+      const tempProvider = new ASRProvider(cfg)
       return await tempProvider.testConnection()
     }
     if (!asrProvider) {

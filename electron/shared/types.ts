@@ -12,8 +12,11 @@ export interface VoiceSession {
   duration?: number
 }
 
+export type ASRProviderId = 'glm' | 'qwen'
+
 export interface ASRConfig {
-  provider: 'glm'
+  /** 当前用于语音转写的后端 */
+  provider: ASRProviderId
   region: 'cn' | 'intl'
   apiKeys: {
     cn: string
@@ -25,6 +28,11 @@ export interface ASRConfig {
 
   endpoint?: string
   language?: string
+
+  /** 阿里云 DashScope（千问 ASR），与 GLM 二选一使用 */
+  qwenApiKey?: string
+  /** cn=北京 dashscope.aliyuncs.com；intl=新加坡 dashscope-intl.aliyuncs.com */
+  qwenRegion?: 'cn' | 'intl'
 }
 
 export interface HotkeyConfig {
@@ -37,10 +45,17 @@ export interface AppPreferences {
   autoLaunch?: boolean
 }
 
+/** ERPNextCN DTY：可选音频归档上传；在设置页配置 host 与 API Key */
+export interface ErpnextcnDtyConfig {
+  host: string
+  apiKey: string
+}
+
 export interface AppConfig {
   app: AppPreferences
   asr: ASRConfig
   hotkey: HotkeyConfig
+  erpnextcnDty: ErpnextcnDtyConfig
 }
 
 export interface HistoryItem {
@@ -128,6 +143,8 @@ export type OverlayStatus = 'recording' | 'processing' | 'success' | 'error'
 export interface OverlayState {
   status: OverlayStatus
   message?: string
+  /** 成功结束但无可插入文本（如 ASR 返回空），HUD 不显示「已注入」 */
+  noTextInjected?: boolean
 }
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

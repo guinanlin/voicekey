@@ -72,6 +72,9 @@ export function AudioRecorder() {
 
         const audioContext = new AudioContext()
         audioContextRef.current = audioContext // 保存引用
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume()
+        }
 
         const source = audioContext.createMediaStreamSource(stream)
         const analyser = audioContext.createAnalyser()
@@ -93,12 +96,18 @@ export function AudioRecorder() {
         }
         sendAudioLevel()
 
-        let mimeType = 'audio/wav'
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'audio/webm'
+        const pickRecorderMimeType = (): string => {
+          const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
+          for (const c of candidates) {
+            if (MediaRecorder.isTypeSupported(c)) {
+              return c
+            }
+          }
+          return ''
         }
 
-        const mediaRecorder = new MediaRecorder(stream, { mimeType })
+        const mimeType = pickRecorderMimeType()
+        const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
         mediaRecorderRef.current = mediaRecorder
         chunksRef.current = []
 
@@ -108,9 +117,14 @@ export function AudioRecorder() {
           }
         }
 
+        /** 周期性产出数据，避免仅依赖 stop 时一次 flush 导致 webm 过小、ASR 无有效音频 */
+        const TIMESLICE_MS = 250
+
         mediaRecorder.onstop = async () => {
           // 处理音频数据
-          const blob = new Blob(chunksRef.current, { type: mimeType })
+          const blob = new Blob(chunksRef.current, {
+            type: mimeType || mediaRecorder.mimeType || 'audio/webm',
+          })
           const buffer = await blob.arrayBuffer()
           window.electronAPI.sendAudioData(buffer)
 
@@ -130,7 +144,7 @@ export function AudioRecorder() {
 
         // eslint-disable-next-line no-console -- debug recording start
         console.log('[Renderer] Recording started')
-        mediaRecorder.start()
+        mediaRecorder.start(TIMESLICE_MS)
       } catch (err) {
         // eslint-disable-next-line no-console -- report mic access failure
         console.error('[Renderer] Failed to start recording:', err)
@@ -144,7 +158,18 @@ export function AudioRecorder() {
       // eslint-disable-next-line no-console -- debug stop trigger
       console.log('[Renderer] onStopRecording triggered')
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop()
+        const mr = mediaRecorderRef.current
+        try {
+          mr.requestData()
+        } catch {
+          // 部分环境不支持 requestData，忽略
+        }
+        // 与 requestData 错开一帧，避免部分 Chromium 上 stop 过早导致 chunks 几乎为空
+        setTimeout(() => {
+          if (mr.state === 'recording') {
+            mr.stop()
+          }
+        }, 0)
       } else {
         // 如果没有活跃的录音，也尝试释放资源（兜底）
         releaseResources()

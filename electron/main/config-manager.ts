@@ -1,12 +1,19 @@
 import Store from 'electron-store'
-import { AppConfig, AppPreferences, ASRConfig, HotkeyConfig } from '../shared/types'
-import { DEFAULT_HOTKEYS } from '../shared/constants'
+import {
+  AppConfig,
+  AppPreferences,
+  ASRConfig,
+  ErpnextcnDtyConfig,
+  HotkeyConfig,
+} from '../shared/types'
+import { DEFAULT_HOTKEYS, ERPNEXTCN_DTY } from '../shared/constants'
 
 // 配置Schema
 interface ConfigSchema {
   app: AppPreferences
   asr: ASRConfig
   hotkey: HotkeyConfig
+  erpnextcnDty: ErpnextcnDtyConfig
 }
 
 // 默认配置
@@ -25,10 +32,16 @@ const defaultConfig: AppConfig = {
     // apiKey: '',  // Deprecated, removed from default
     endpoint: '',
     language: 'auto',
+    qwenApiKey: '',
+    qwenRegion: 'cn',
   },
   hotkey: {
     pttKey: DEFAULT_HOTKEYS.PTT,
     toggleSettings: DEFAULT_HOTKEYS.SETTINGS,
+  },
+  erpnextcnDty: {
+    host: '',
+    apiKey: '',
   },
 }
 
@@ -59,6 +72,16 @@ export class ConfigManager {
         this.store.delete('asr.apiKey' as any)
       }
     }
+    const raw = this.store.get('asr') as ASRConfig
+    if (raw && raw.provider !== 'glm' && raw.provider !== 'qwen') {
+      this.store.set('asr.provider', 'glm')
+    }
+    if (raw && (raw.qwenRegion === undefined || raw.qwenRegion === null)) {
+      this.store.set('asr.qwenRegion', 'cn')
+    }
+    if (raw && raw.qwenApiKey === undefined) {
+      this.store.set('asr.qwenApiKey', '')
+    }
   }
 
   // 获取完整配置
@@ -67,6 +90,7 @@ export class ConfigManager {
       app: this.getAppConfig(),
       asr: this.getASRConfig(),
       hotkey: this.getHotkeyConfig(),
+      erpnextcnDty: this.getErpnextcnDtyFromStore(),
     }
   }
 
@@ -92,7 +116,14 @@ export class ConfigManager {
     if (!config.region) {
       config.region = 'cn'
     }
-    return config
+    if (config.provider !== 'glm' && config.provider !== 'qwen') {
+      return { ...config, provider: 'glm' }
+    }
+    return {
+      ...config,
+      qwenApiKey: config.qwenApiKey ?? '',
+      qwenRegion: config.qwenRegion === 'intl' ? 'intl' : 'cn',
+    }
   }
 
   // 设置ASR配置
@@ -112,6 +143,25 @@ export class ConfigManager {
     this.store.set('hotkey', { ...current, ...config })
   }
 
+  /** 界面与 IPC 使用：持久化中的原始值（host 为空表示使用内置默认服务地址） */
+  getErpnextcnDtyFromStore(): ErpnextcnDtyConfig {
+    return this.store.get('erpnextcnDty', defaultConfig.erpnextcnDty)
+  }
+
+  /** 上传前解析：host 为空时回退到 ERPNEXTCN_DTY.DEFAULT_HOST */
+  getErpnextcnDtyResolvedForUpload(): ErpnextcnDtyConfig {
+    const stored = this.getErpnextcnDtyFromStore()
+    return {
+      host: (stored.host?.trim() || ERPNEXTCN_DTY.DEFAULT_HOST).replace(/\/$/, ''),
+      apiKey: stored.apiKey?.trim() || '',
+    }
+  }
+
+  setErpnextcnDtyConfig(config: Partial<ErpnextcnDtyConfig>): void {
+    const current = this.store.get('erpnextcnDty', defaultConfig.erpnextcnDty)
+    this.store.set('erpnextcnDty', { ...current, ...config })
+  }
+
   // 重置为默认配置
   reset(): void {
     this.store.clear()
@@ -120,6 +170,9 @@ export class ConfigManager {
   // 检查配置是否有效
   isValid(): boolean {
     const asr = this.getASRConfig()
+    if (asr.provider === 'qwen') {
+      return !!asr.qwenApiKey?.trim()
+    }
     const region = asr.region || 'cn'
     const key = asr.apiKeys?.[region]
     return !!key && key.length > 0

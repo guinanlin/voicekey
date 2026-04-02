@@ -16,6 +16,76 @@ export interface TranscriptionError {
   message: string
 }
 
+/** `message.content` 可能是 string，或 multimodal 数组（如 `{ type, text }[]`） */
+function normalizeAssistantContent(content: unknown): string | null {
+  if (typeof content === 'string') {
+    return content
+  }
+  if (Array.isArray(content)) {
+    const parts: string[] = []
+    for (const part of content) {
+      if (typeof part === 'string') {
+        parts.push(part)
+      } else if (part && typeof part === 'object' && 'text' in part) {
+        const t = (part as { text?: unknown }).text
+        if (typeof t === 'string') {
+          parts.push(t)
+        }
+      }
+    }
+    return parts.length > 0 ? parts.join('') : null
+  }
+  return null
+}
+
+/**
+ * 智谱 ASR 可能返回：
+ * - 旧式：`{ text, id, created, model }`
+ * - 新式（类 Chat Completion）：`{ choices: [{ message: { content } }], id, model, ... }`
+ */
+function extractTranscriptionPayload(data: unknown): {
+  text: string
+  id: string
+  created: number
+  model: string
+} | null {
+  if (!data || typeof data !== 'object') {
+    return null
+  }
+  const d = data as Record<string, unknown>
+
+  if (d.error) {
+    const errObj = d.error as { message?: string; code?: string }
+    throw new Error(`ASR Error: ${errObj.message || errObj.code || JSON.stringify(d.error)}`)
+  }
+
+  if (typeof d.text === 'string') {
+    return {
+      text: d.text,
+      id: typeof d.id === 'string' ? d.id : '',
+      created: typeof d.created === 'number' ? d.created : Date.now(),
+      model: typeof d.model === 'string' ? d.model : GLM_ASR.MODEL,
+    }
+  }
+
+  const choices = d.choices
+  if (Array.isArray(choices) && choices.length > 0) {
+    const first = choices[0] as { message?: { content?: unknown } }
+    const content = first?.message?.content
+    const text = normalizeAssistantContent(content)
+    if (text !== null) {
+      return {
+        text,
+        id: typeof d.id === 'string' ? d.id : '',
+        created: typeof d.created === 'number' ? d.created : Date.now(),
+        model: typeof d.model === 'string' ? d.model : GLM_ASR.MODEL,
+      }
+    }
+  }
+
+  return null
+}
+
 export class ASRProvider {
   private config: ASRConfig
 
@@ -83,11 +153,20 @@ export class ASRProvider {
       console.log(`[ASR] [${new Date().toISOString()}] API response received`)
       console.log(`[ASR] ⏱️  API network request took ${requestDuration}ms`)
 
-      if (!response.data || !response.data.text) {
+      const payload = extractTranscriptionPayload(response.data)
+      if (!payload) {
+        const preview =
+          typeof response.data === 'object' && response.data !== null
+            ? JSON.stringify(response.data).slice(0, 2000)
+            : String(response.data)
+        console.error(
+          '[ASR] Unexpected response shape (no text / choices[0].message.content):',
+          preview,
+        )
         throw new Error('Invalid response from ASR service')
       }
 
-      const receivedText = response.data.text
+      const receivedText = payload.text
       console.log('[ASR] Raw response text:', receivedText)
       console.log('[ASR] Text length:', receivedText.length)
       console.log('[ASR] Text bytes:', Buffer.from(receivedText, 'utf8').toString('hex'))
@@ -97,9 +176,9 @@ export class ASRProvider {
 
       return {
         text: receivedText,
-        id: response.data.id || '',
-        created: response.data.created || Date.now(),
-        model: response.data.model || GLM_ASR.MODEL,
+        id: payload.id,
+        created: payload.created,
+        model: payload.model,
       }
     } catch (error: unknown) {
       const errorDuration = Date.now() - transcribeStartTime

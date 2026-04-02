@@ -16,6 +16,7 @@ shadcn/ui 组件库，基于 Radix UI 构建的可复用 UI 组件集合。包�
 
 - 监听主进程的录音信号
 - 管理音频流生命周期（防止麦克风占用和内存泄漏）
+- 优先 `audio/webm;codecs=opus`；`AudioContext` 在 `suspended` 时 `resume()`；`MediaRecorder.start(250ms)` 分片；`requestData()` 后 `setTimeout(0)` 再 `stop()`，减轻 Chromium 上 chunks 过小问题
 - 录制并发送音频数据回主进程
 - 不渲染任何 UI（返回 `null`）
 
@@ -25,7 +26,7 @@ shadcn/ui 组件库，基于 Radix UI 构建的可复用 UI 组件集合。包�
 
 - 显示录音状态和实时波形动画
 - 提供取消/完成操作按钮
-- 展示处理中、成功或错误状态反馈
+- 展示处理中、成功或错误状态反馈；`noTextInjected` 时成功态不显示「已注入」
 - 自适应状态球和紧凑布局
 
 ### `HotkeyRecorder.tsx`
