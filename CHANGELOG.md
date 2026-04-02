@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.25](https://github.com/guinanlin/voicekey/compare/v0.2.24...v0.2.25) (2026-04-02)
+
+### Bug Fixes
+
+- **electron:** prefer xdotool for after_key on Linux paste path ([3d471c7](https://github.com/guinanlin/voicekey/commit/3d471c7a55738f9fcc75c34f943e141d42fcfbab))
+
 ### [0.2.24](https://github.com/guinanlin/voicekey/compare/v0.2.23...v0.2.24) (2026-04-02)
 
 ### [0.2.23](https://github.com/guinanlin/voicekey/compare/v0.2.22...v0.2.23) (2026-04-02)
