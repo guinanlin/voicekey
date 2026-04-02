@@ -48,34 +48,39 @@ export default function HomePage() {
       }
     }
     loadHistory()
+    const unsub = window.electronAPI.onHistoryChanged(() => {
+      void loadHistory()
+    })
+    return unsub
   }, [])
 
   return (
-    <div className="flex max-w-4xl flex-col gap-3">
-      <div className="space-y-0.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-bold text-foreground">{t('home.title')}</h1>
-          {loading ? <Badge variant="outline">{t('common.loadingHistory')}</Badge> : null}
-        </div>
-        <p className="text-sm text-muted-foreground">
-          <Trans
-            i18nKey="home.subtitle"
-            values={{ hotkey: config.hotkey.pttKey || 'Ctrl+Shift+Space' }}
-            components={{ kbd: <Kbd className="bg-primary text-primary-foreground" /> }}
-          />
-        </p>
+    <div className="flex min-h-full max-w-4xl flex-col gap-3 pb-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="text-xl font-bold text-foreground">{t('home.title')}</h1>
+        {loading ? <Badge variant="outline">{t('common.loadingHistory')}</Badge> : null}
       </div>
 
-      <div className="flex flex-col md:flex-row gap-2.5 items-stretch">
-        <div className="flex-1 flex min-h-0">
-          <ServiceStatusCard />
+      <div className="flex flex-1 flex-col gap-3 min-h-0">
+        <div className="flex flex-col md:flex-row gap-2.5 items-stretch">
+          <div className="flex-1 flex min-h-0">
+            <ServiceStatusCard />
+          </div>
+          <div className="flex-1 flex flex-col gap-2.5 min-h-0">
+            <StatsOverview historyItems={historyItems} />
+          </div>
         </div>
-        <div className="flex-1 flex flex-col gap-2.5 min-h-0">
-          <StatsOverview historyItems={historyItems} />
-        </div>
+
+        <InteractiveCharts historyItems={historyItems} loading={loading} />
       </div>
 
-      <InteractiveCharts historyItems={historyItems} loading={loading} />
+      <p className="shrink-0 self-end max-w-md text-right text-xs leading-relaxed text-muted-foreground">
+        <Trans
+          i18nKey="home.subtitle"
+          values={{ hotkey: config.hotkey.pttKey || 'Ctrl+Shift+Space' }}
+          components={{ kbd: <Kbd className="bg-primary text-primary-foreground" /> }}
+        />
+      </p>
     </div>
   )
 }

@@ -34,6 +34,11 @@ IPC 通信桥接脚本，运行在渲染进程上下文但可访问部分 Node.j
 - `registerHotkey(accelerator)` - 注册全局快捷键
 - `unregisterHotkey(accelerator)` - 注销快捷键
 
+**历史记录**
+
+- `getHistory()` / `clearHistory()` / `deleteHistoryItem(id)` - 读取、清空、删除
+- `onHistoryChanged(callback)` - 主进程追加历史后通知（如 HTTP `/clipboard/type` 成功）
+
 **事件监听**
 
 - `onSessionStatus(callback)` - 会话状态变化

@@ -1,16 +1,9 @@
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import { clipboard, type NativeImage } from 'electron'
+import { clipboard } from 'electron'
 import { keyboard, Key } from '@nut-tree-fork/nut-js'
 
 const execFileAsync = promisify(execFile)
-
-type ClipboardSnapshot = {
-  text?: string
-  html?: string
-  rtf?: string
-  image?: NativeImage
-}
 
 export class TextInjector {
   constructor() {
@@ -90,10 +83,9 @@ export class TextInjector {
   /**
    * 内部实现：实际执行键盘输入/剪贴板粘贴
    *
-   * Windows/Linux：使用剪贴板粘贴 (Ctrl+V)。
-   * - keyboard.type() 模拟原始按键，不经过 IME，中文等 Unicode 会乱码。
-   * - 剪贴板写入 UTF-8 文本再粘贴，可正确注入多语言内容。
-   * - Linux 注意：nut-js 依赖 X11 的键盘模拟；Wayland 下可能无法把按键送到目标窗口，
+   * Windows/Linux：`clipboard.writeText` 后模拟 Ctrl+V；注入结束后系统剪贴板保留为本次文本，不恢复注入前内容。
+   * - 若用 keyboard.type() 模拟原始按键，不经过 IME，中文等 Unicode 会乱码，故 Win/Linux 走剪贴板。
+   * - Linux：nut-js 依赖 X11 的键盘模拟；Wayland 下可能无法把按键送到目标窗口，
    *   若注入无效可尝试在 X11 会话下运行，或使用「仅复制到剪贴板」再手动粘贴。
    * macOS：沿用 keyboard.type()（若遇中文乱码可后续改为剪贴板）。
    */
@@ -103,52 +95,6 @@ export class TextInjector {
       return
     }
     await keyboard.type(text)
-  }
-
-  private captureClipboard(): ClipboardSnapshot {
-    const formats = clipboard.availableFormats()
-    const snapshot: ClipboardSnapshot = {}
-
-    if (formats.includes('text/plain')) {
-      snapshot.text = clipboard.readText()
-    }
-    if (formats.includes('text/html')) {
-      snapshot.html = clipboard.readHTML()
-    }
-    if (formats.includes('text/rtf')) {
-      snapshot.rtf = clipboard.readRTF()
-    }
-    if (formats.some((format) => format.startsWith('image/'))) {
-      const image = clipboard.readImage()
-      if (!image.isEmpty()) {
-        snapshot.image = image
-      }
-    }
-
-    return snapshot
-  }
-
-  private restoreClipboard(snapshot: ClipboardSnapshot): void {
-    const data: Electron.Data = {}
-    if (snapshot.text !== undefined) {
-      data.text = snapshot.text
-    }
-    if (snapshot.html !== undefined) {
-      data.html = snapshot.html
-    }
-    if (snapshot.rtf !== undefined) {
-      data.rtf = snapshot.rtf
-    }
-    if (snapshot.image && !snapshot.image.isEmpty()) {
-      data.image = snapshot.image
-    }
-
-    if (Object.keys(data).length === 0) {
-      console.warn('[TextInjector] Clipboard restore skipped: no standard formats captured')
-      return
-    }
-
-    clipboard.write(data)
   }
 
   /**
@@ -170,36 +116,34 @@ export class TextInjector {
     }
   }
 
+  /**
+   * Win/Linux：写入剪贴板并粘贴；不快照、不恢复，完成后剪贴板即为本次文本。
+   */
   private async pasteFromClipboard(text: string): Promise<void> {
-    const snapshot = this.captureClipboard()
-    try {
-      if (process.platform === 'win32') {
-        console.log('[TextInjector] Writing to clipboard (Windows):', {
-          textLength: text.length,
-          firstChars: text.substring(0, 20),
-          textBytes: Buffer.from(text, 'utf8').toString('hex').substring(0, 40),
-        })
-      }
-      clipboard.writeText(text)
-      await this.delay(100)
-
-      if (process.platform === 'linux') {
-        // Linux/X11: 优先用 xdotool --clearmodifiers，消除修饰键残留状态
-        const ok = await this.tryXdotoolPaste()
-        if (ok) {
-          await this.delay(50)
-          return
-        }
-        // xdotool 不可用，回退到 nut-js
-        console.log('[TextInjector] Falling back to nut-js for paste')
-      }
-
-      await keyboard.pressKey(Key.LeftControl, Key.V)
-      await keyboard.releaseKey(Key.LeftControl, Key.V)
-      await this.delay(50)
-    } finally {
-      this.restoreClipboard(snapshot)
+    if (process.platform === 'win32') {
+      console.log('[TextInjector] Writing to clipboard (Windows):', {
+        textLength: text.length,
+        firstChars: text.substring(0, 20),
+        textBytes: Buffer.from(text, 'utf8').toString('hex').substring(0, 40),
+      })
     }
+    clipboard.writeText(text)
+    await this.delay(100)
+
+    if (process.platform === 'linux') {
+      // Linux/X11: 优先用 xdotool --clearmodifiers，消除修饰键残留状态
+      const ok = await this.tryXdotoolPaste()
+      if (ok) {
+        await this.delay(50)
+        return
+      }
+      // xdotool 不可用，回退到 nut-js
+      console.log('[TextInjector] Falling back to nut-js for paste')
+    }
+
+    await keyboard.pressKey(Key.LeftControl, Key.V)
+    await keyboard.releaseKey(Key.LeftControl, Key.V)
+    await this.delay(50)
   }
 
   // 延迟函数

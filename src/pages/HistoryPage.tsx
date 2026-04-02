@@ -86,6 +86,13 @@ export default function HistoryPage() {
     loadHistory()
   }, [loadHistory])
 
+  React.useEffect(() => {
+    const unsub = window.electronAPI.onHistoryChanged(() => {
+      void loadHistory()
+    })
+    return unsub
+  }, [loadHistory])
+
   const filteredItems = React.useMemo(() => {
     const filtered = items.filter((item) =>
       item.text.toLowerCase().includes(searchQuery.toLowerCase()),

@@ -1,8 +1,19 @@
+import { BrowserWindow } from 'electron'
 import Fastify from 'fastify'
 import swagger from '@fastify/swagger'
 import swaggerUI from '@fastify/swagger-ui'
 import cors from '@fastify/cors'
+import { IPC_CHANNELS } from '../shared/types'
+import { historyManager } from './history-manager'
 import { textInjector } from './text-injector'
+
+function broadcastHistoryChanged(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(IPC_CHANNELS.HISTORY_CHANGED)
+    }
+  }
+}
 
 const fastify = Fastify({
   logger: {
@@ -166,12 +177,19 @@ function registerRoutes() {
       }
 
       try {
-        const result = await textInjector.typeText(body.text, body.mode || 'type', body.after_key)
+        const mode = body.mode || 'type'
+        const result = await textInjector.typeText(body.text, mode, body.after_key)
 
         if (!result.success) {
           const statusCode = getHttpStatusCode(result.code)
           reply.code(statusCode)
           return result
+        }
+
+        const trimmed = body.text?.trim() ?? ''
+        if (trimmed && (mode === 'type' || mode === 'clipboard')) {
+          historyManager.add({ text: trimmed })
+          broadcastHistoryChanged()
         }
 
         return result

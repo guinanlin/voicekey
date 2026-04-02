@@ -104,6 +104,7 @@ export const IPC_CHANNELS = {
   HISTORY_GET: 'history:get',
   HISTORY_CLEAR: 'history:clear',
   HISTORY_DELETE: 'history:delete',
+  HISTORY_CHANGED: 'history:changed',
 
   // 更新相关
   CHECK_FOR_UPDATES: 'update:check',

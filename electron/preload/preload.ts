@@ -32,6 +32,7 @@ export interface ElectronAPI {
   getHistory: () => Promise<HistoryItem[]>
   clearHistory: () => Promise<void>
   deleteHistoryItem: (id: string) => Promise<void>
+  onHistoryChanged: (callback: () => void) => () => void
 
   // 快捷键相关
   registerHotkey: (accelerator: string) => Promise<boolean>
@@ -97,6 +98,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getHistory: () => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_GET),
   clearHistory: () => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_CLEAR),
   deleteHistoryItem: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_DELETE, id),
+  onHistoryChanged: (callback: () => void) => {
+    const listener = () => callback()
+    ipcRenderer.on(IPC_CHANNELS.HISTORY_CHANGED, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.HISTORY_CHANGED, listener)
+  },
 
   // 快捷键相关
   registerHotkey: (accelerator: string) =>
