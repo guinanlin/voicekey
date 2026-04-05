@@ -25,7 +25,12 @@ import { fileURLToPath } from 'node:url'
 import { UiohookKey } from 'uiohook-napi'
 import { ASRProvider } from './asr-provider'
 import { configManager } from './config-manager'
-import { fileUrlFromErpnextUploadResponse, uploadErpnextcnDtyMp3 } from './erpnextcn-upload'
+import { DASHSCOPE } from '../shared/constants'
+import {
+  fileUrlFromErpnextUploadResponse,
+  uploadErpnextcnDtyFile,
+  uploadErpnextcnDtyMp3,
+} from './erpnextcn-upload'
 import { testQwenDashScopeConnection, transcribeQwenFromFileUrl } from './qwen-asr-provider'
 import { historyManager } from './history-manager'
 import { hotkeyManager } from './hotkey-manager'
@@ -669,26 +674,27 @@ async function handleAudioData(buffer: Buffer) {
     const saveDuration = Date.now() - saveStartTime
     console.log(`[Main] ⏱️  File save took ${saveDuration}ms`)
 
-    const conversionStartTime = Date.now()
-    await convertToMP3(tempWebmPath, tempMp3Path)
-    const conversionDuration = Date.now() - conversionStartTime
-    console.log(`[Main] [${new Date().toISOString()}] Audio converted to MP3: ${tempMp3Path}`)
-    console.log(`[Main] ⏱️  Total conversion process took ${conversionDuration}ms`)
-
     const asrCfg = configManager.getASRConfig()
+    let conversionDuration = 0
     let asrDuration = 0
     let transcription: Awaited<ReturnType<ASRProvider['transcribe']>>
 
     if (asrCfg.provider === 'qwen') {
+      const webmSize = fs.statSync(tempWebmPath).size
+      if (webmSize > DASHSCOPE.QWEN_SHORT_MAX_FILE_BYTES) {
+        throw new Error(t('errors.qwenFileTooLarge'))
+      }
       const erpResolved = configManager.getErpnextcnDtyResolvedForUpload()
       if (!erpResolved.apiKey.trim()) {
         throw new Error(t('errors.qwenNeedsErpnextUpload'))
       }
       const asrStartTime = Date.now()
       console.log(
-        `[Main] [${new Date().toISOString()}] Qwen: ERPNextCN upload (required) then DashScope...`,
+        `[Main] [${new Date().toISOString()}] Qwen: ERPNextCN upload WebM/Opus then DashScope multimodal sync...`,
       )
-      const uploadData = await uploadErpnextcnDtyMp3(tempMp3Path, erpResolved)
+      const uploadData = await uploadErpnextcnDtyFile(tempWebmPath, erpResolved, {
+        contentType: 'audio/webm',
+      })
       if (uploadData === null) {
         throw new Error(t('errors.qwenNeedsErpnextUpload'))
       }
@@ -704,6 +710,12 @@ async function handleAudioData(buffer: Buffer) {
       }
       asrDuration = Date.now() - asrStartTime
     } else {
+      const conversionStartTime = Date.now()
+      await convertToMP3(tempWebmPath, tempMp3Path)
+      conversionDuration = Date.now() - conversionStartTime
+      console.log(`[Main] [${new Date().toISOString()}] Audio converted to MP3: ${tempMp3Path}`)
+      console.log(`[Main] ⏱️  Total conversion process took ${conversionDuration}ms`)
+
       if (!asrProvider) {
         const initStartTime = Date.now()
         console.log(`[Main] [${new Date().toISOString()}] Initializing ASR provider...`)

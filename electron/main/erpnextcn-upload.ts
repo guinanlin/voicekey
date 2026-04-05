@@ -9,13 +9,19 @@ export interface ErpnextcnDtyResolved {
   apiKey: string
 }
 
+export interface ErpnextcnUploadOptions {
+  /** multipart 文件 Content-Type，如 audio/webm、audio/mpeg */
+  contentType: string
+}
+
 /**
- * 将 MP3 上传到 ERPNextCN DTY OSS 接口（与 Python upload_to_erpnextcn_dty 行为对齐）。
+ * 将本地音频以 multipart 上传到 ERPNextCN DTY OSS（与 Python upload_to_erpnextcn_dty 行为对齐）。
  * 调用方应对异常自行捕获；未配置 host/key 时直接跳过。
  */
-export async function uploadErpnextcnDtyMp3(
-  mp3Path: string,
+export async function uploadErpnextcnDtyFile(
+  localPath: string,
   resolved: ErpnextcnDtyResolved,
+  options: ErpnextcnUploadOptions,
 ): Promise<unknown | null> {
   const { host, apiKey } = resolved
   if (!host.trim() || !apiKey.trim()) {
@@ -25,17 +31,17 @@ export async function uploadErpnextcnDtyMp3(
 
   const base = host.replace(/\/$/, '')
   const uploadUrl = `${base}${ERPNEXTCN_DTY.UPLOAD_PATH}`
-  const basename = path.basename(mp3Path)
+  const basename = path.basename(localPath)
   const objectName = `/uploads/${basename}`
 
   const form = new FormData()
-  form.append('file', fs.createReadStream(mp3Path), {
+  form.append('file', fs.createReadStream(localPath), {
     filename: basename,
-    contentType: 'audio/mpeg',
+    contentType: options.contentType,
   })
 
   const uploadStart = Date.now()
-  console.log(`[ERPNextCN] Uploading ${basename}...`)
+  console.log(`[ERPNextCN] Uploading ${basename} (${options.contentType})...`)
 
   try {
     const response = await axios.post(uploadUrl, form, {
@@ -66,9 +72,17 @@ export async function uploadErpnextcnDtyMp3(
   }
 }
 
+/** GLM 路径：转码后的 MP3 归档上传 */
+export async function uploadErpnextcnDtyMp3(
+  mp3Path: string,
+  resolved: ErpnextcnDtyResolved,
+): Promise<unknown | null> {
+  return uploadErpnextcnDtyFile(mp3Path, resolved, { contentType: 'audio/mpeg' })
+}
+
 /**
- * 从 ERPNextCN 上传成功响应拼出公网 HTTPS URL，供 DashScope `file_url` 使用。
- * 期望字段：`domain`（如 https://xxx.cos...）、`object_name`（如 /uploads/xxx.mp3）。
+ * 从 ERPNextCN 上传成功响应拼出公网 HTTPS URL，供 DashScope `audio` / 原 `file_url` 使用。
+ * 期望字段：`domain`、`object_name`（如 /uploads/xxx.webm）。
  */
 export function fileUrlFromErpnextUploadResponse(data: unknown): string | null {
   if (!data || typeof data !== 'object') {
@@ -82,12 +96,12 @@ export function fileUrlFromErpnextUploadResponse(data: unknown): string | null {
     console.warn('[ERPNextCN] file_url: missing domain or object_name', data)
     return null
   }
-  const path = objectName.startsWith('/') ? objectName : `/${objectName}`
+  const objectPath = objectName.startsWith('/') ? objectName : `/${objectName}`
   try {
-    const u = new URL(path, domain.endsWith('/') ? domain : `${domain}/`)
+    const u = new URL(objectPath, domain.endsWith('/') ? domain : `${domain}/`)
     return u.href
   } catch {
-    const joined = `${domain}${path}`
+    const joined = `${domain}${objectPath}`
     return joined.startsWith('https://') ? joined : null
   }
 }

@@ -31,8 +31,8 @@ export interface ASRConfig {
 
   /** 阿里云 DashScope（千问 ASR），与 GLM 二选一使用 */
   qwenApiKey?: string
-  /** cn=北京 dashscope.aliyuncs.com；intl=新加坡 dashscope-intl.aliyuncs.com */
-  qwenRegion?: 'cn' | 'intl'
+  /** cn=北京；intl=新加坡；us=美国（弗吉尼亚），模型为 qwen3-asr-flash-us */
+  qwenRegion?: 'cn' | 'intl' | 'us'
 }
 
 export interface HotkeyConfig {
@@ -40,9 +40,22 @@ export interface HotkeyConfig {
   toggleSettings: string
 }
 
+/** 应用内麦克风采集与 MediaRecorder 参数（设置页「应用偏好」可配） */
+export interface AudioCapturePreferences {
+  /** WebM/Opus 目标码率（bps），过小可能影响识别 */
+  opusBitsPerSecond: number
+  /** 优先单声道以减小体积 */
+  preferMono: boolean
+  echoCancellation: boolean
+  noiseSuppression: boolean
+  /** 约束失败时回退为 `{ audio: true }` */
+  fallbackOnMicConstraintFailure: boolean
+}
+
 export interface AppPreferences {
   language: LanguageSetting
   autoLaunch?: boolean
+  audioCapture?: AudioCapturePreferences
 }
 
 /** ERPNextCN DTY：可选音频归档上传；在设置页配置 host 与 API Key */

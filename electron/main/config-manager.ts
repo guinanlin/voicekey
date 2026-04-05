@@ -6,7 +6,17 @@ import {
   ErpnextcnDtyConfig,
   HotkeyConfig,
 } from '../shared/types'
-import { DEFAULT_HOTKEYS, ERPNEXTCN_DTY } from '../shared/constants'
+import {
+  DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+  DEFAULT_HOTKEYS,
+  ERPNEXTCN_DTY,
+  type QwenDashScopeRegion,
+} from '../shared/constants'
+
+function normalizeQwenRegion(raw: unknown): QwenDashScopeRegion {
+  if (raw === 'intl' || raw === 'us') return raw
+  return 'cn'
+}
 
 // 配置Schema
 interface ConfigSchema {
@@ -21,6 +31,7 @@ const defaultConfig: AppConfig = {
   app: {
     language: 'system',
     autoLaunch: false,
+    audioCapture: DEFAULT_AUDIO_CAPTURE_PREFERENCES,
   },
   asr: {
     provider: 'glm',
@@ -82,6 +93,15 @@ export class ConfigManager {
     if (raw && raw.qwenApiKey === undefined) {
       this.store.set('asr.qwenApiKey', '')
     }
+
+    const appRaw = this.store.get('app') as AppPreferences
+    if (appRaw && appRaw.audioCapture === undefined) {
+      this.store.set('app', {
+        ...defaultConfig.app,
+        ...appRaw,
+        audioCapture: DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+      })
+    }
   }
 
   // 获取完整配置
@@ -96,13 +116,32 @@ export class ConfigManager {
 
   // 获取 App 配置
   getAppConfig(): AppPreferences {
-    return this.store.get('app', defaultConfig.app)
+    const raw = this.store.get('app', defaultConfig.app)
+    return {
+      ...defaultConfig.app,
+      ...raw,
+      audioCapture: {
+        ...DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+        ...(raw.audioCapture ?? {}),
+      },
+    }
   }
 
   // 设置 App 配置
   setAppConfig(config: Partial<AppPreferences>): void {
     const current = this.getAppConfig()
-    this.store.set('app', { ...current, ...config })
+    let next: AppPreferences = { ...current, ...config }
+    if (config.audioCapture !== undefined) {
+      next = {
+        ...next,
+        audioCapture: {
+          ...DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+          ...current.audioCapture,
+          ...config.audioCapture,
+        },
+      }
+    }
+    this.store.set('app', next)
   }
 
   // 获取ASR配置
@@ -122,7 +161,7 @@ export class ConfigManager {
     return {
       ...config,
       qwenApiKey: config.qwenApiKey ?? '',
-      qwenRegion: config.qwenRegion === 'intl' ? 'intl' : 'cn',
+      qwenRegion: normalizeQwenRegion(config.qwenRegion),
     }
   }
 

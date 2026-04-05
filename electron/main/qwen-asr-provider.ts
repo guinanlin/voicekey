@@ -1,37 +1,9 @@
 import axios from 'axios'
-import { DASHSCOPE } from '../shared/constants'
+import { qwenMultimodalGenerationUrl, qwenShortAsrModelName } from '../shared/constants'
 import type { ASRConfig } from '../shared/types'
 import type { TranscriptionResult } from './asr-provider'
 
-const POLL_INTERVAL_MS = 1_500
-const POLL_TIMEOUT_MS = 120_000
-const SUBMIT_TIMEOUT_MS = 60_000
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function dashscopeBase(region: ASRConfig['qwenRegion']): string {
-  return region === 'intl' ? DASHSCOPE.BASE_INTL : DASHSCOPE.BASE_CN
-}
-
-function dashscopeAsyncHeaders(apiKey: string): Record<string, string> {
-  return {
-    Authorization: `Bearer ${apiKey}`,
-    'Content-Type': 'application/json',
-    'X-DashScope-Async': 'enable',
-  }
-}
-
-function extractTaskId(data: unknown): string | null {
-  if (!data || typeof data !== 'object') return null
-  const out = (data as Record<string, unknown>).output
-  if (!out || typeof out !== 'object') return null
-  const o = out as Record<string, unknown>
-  if (typeof o.task_id === 'string' && o.task_id.trim()) return o.task_id.trim()
-  if (typeof o.taskId === 'string' && o.taskId.trim()) return o.taskId.trim()
-  return null
-}
+const SYNC_REQUEST_TIMEOUT_MS = 120_000
 
 function getOutput(data: unknown): Record<string, unknown> | null {
   if (!data || typeof data !== 'object') return null
@@ -53,29 +25,30 @@ function formatDashScopeHttpError(status: number, data: unknown): string {
   return `HTTP ${status}`
 }
 
-function transcriptionUrlFromOutput(out: Record<string, unknown>): string | null {
-  const result = out.result
-  if (!result || typeof result !== 'object') return null
-  const u = (result as Record<string, unknown>).transcription_url
-  return typeof u === 'string' && u.trim() ? u.trim() : null
-}
-
-/** 解析 `transcription_url` 指向的 JSON（官方 transcripts[].text） */
-function textFromTranscriptionResultJson(data: unknown): string {
-  if (!data || typeof data !== 'object') return ''
-  const d = data as { transcripts?: unknown }
-  if (!Array.isArray(d.transcripts)) return ''
+/** 解析千问3-ASR-Flash 同步接口 `output.choices[0].message.content` 中的文本片段 */
+function textFromMultimodalOutput(data: unknown): string {
+  const out = getOutput(data)
+  if (!out) return ''
+  const choices = out.choices
+  if (!Array.isArray(choices) || choices.length === 0) return ''
+  const first = choices[0]
+  if (!first || typeof first !== 'object') return ''
+  const message = (first as { message?: unknown }).message
+  if (!message || typeof message !== 'object') return ''
+  const content = (message as { content?: unknown }).content
+  if (!Array.isArray(content)) return ''
   const parts: string[] = []
-  for (const item of d.transcripts) {
-    if (!item || typeof item !== 'object') continue
-    const text = (item as { text?: unknown }).text
-    if (typeof text === 'string' && text.trim()) parts.push(text.trim())
+  for (const item of content) {
+    if (item && typeof item === 'object' && typeof (item as { text?: unknown }).text === 'string') {
+      const t = (item as { text: string }).text
+      if (t.trim()) parts.push(t.trim())
+    }
   }
-  return parts.join('\n')
+  return parts.join('')
 }
 
 /**
- * 提交异步任务并轮询；成功后拉取 `transcription_url` 的 JSON 得到正文。
+ * DashScope 同步多模态：公网音频 URL → 转写文本（千问短音频 qwen3-asr-flash / qwen3-asr-flash-us）。
  */
 export async function transcribeQwenFromFileUrl(
   config: ASRConfig,
@@ -86,38 +59,56 @@ export async function transcribeQwenFromFileUrl(
     throw new Error('Qwen ASR: API key is empty')
   }
 
-  const base = dashscopeBase(config.qwenRegion)
-  const submitUrl = `${base}/api/v1/services/audio/asr/transcription`
-  const parameters: Record<string, unknown> = {
-    channel_id: [0],
+  const url = qwenMultimodalGenerationUrl(config.qwenRegion)
+  const model = qwenShortAsrModelName(config.qwenRegion)
+
+  const asrOptions: Record<string, unknown> = {
     enable_itn: false,
   }
   const lang = config.language?.trim()
   if (lang && lang !== 'auto') {
-    parameters.language = lang
+    asrOptions.language = lang
   }
 
-  let taskId: string
+  const body = {
+    model,
+    input: {
+      messages: [
+        {
+          role: 'user' as const,
+          content: [{ audio: fileUrl }],
+        },
+      ],
+    },
+    parameters: {
+      asr_options: asrOptions,
+    },
+  }
+
   try {
-    const submitRes = await axios.post(
-      submitUrl,
-      {
-        model: DASHSCOPE.QWEN_ASR_MODEL,
-        input: { file_url: fileUrl },
-        parameters,
+    const res = await axios.post(url, body, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-      {
-        headers: dashscopeAsyncHeaders(apiKey),
-        timeout: SUBMIT_TIMEOUT_MS,
-        validateStatus: (s) => s === 200,
-      },
-    )
-    const id = extractTaskId(submitRes.data)
-    if (!id) {
-      console.error('[QwenASR] Submit response missing task_id:', submitRes.data)
-      throw new Error('Qwen ASR: submit response missing task_id')
+      timeout: SYNC_REQUEST_TIMEOUT_MS,
+      validateStatus: (s) => s === 200,
+    })
+
+    const text = textFromMultimodalOutput(res.data)
+    const requestId =
+      typeof res.data === 'object' &&
+      res.data !== null &&
+      typeof (res.data as { request_id?: unknown }).request_id === 'string'
+        ? (res.data as { request_id: string }).request_id
+        : ''
+
+    return {
+      text,
+      id: requestId,
+      created: Date.now(),
+      model,
     }
-    taskId = id
   } catch (err) {
     if (axios.isAxiosError(err) && err.response) {
       const msg = formatDashScopeHttpError(err.response.status, err.response.data)
@@ -125,89 +116,35 @@ export async function transcribeQwenFromFileUrl(
     }
     throw err
   }
-
-  const pollUrl = `${base}/api/v1/tasks/${taskId}`
-  const deadline = Date.now() + POLL_TIMEOUT_MS
-
-  while (Date.now() < deadline) {
-    let pollRes
-    try {
-      pollRes = await axios.get(pollUrl, {
-        headers: dashscopeAsyncHeaders(apiKey),
-        timeout: SUBMIT_TIMEOUT_MS,
-        validateStatus: (s) => s === 200,
-      })
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response) {
-        const msg = formatDashScopeHttpError(err.response.status, err.response.data)
-        throw new Error(`Qwen ASR: ${msg}`)
-      }
-      throw err
-    }
-
-    const out = getOutput(pollRes.data)
-    if (!out) {
-      throw new Error('Qwen ASR: poll response missing output')
-    }
-
-    const taskStatus = typeof out.task_status === 'string' ? out.task_status : ''
-    if (taskStatus === 'SUCCEEDED') {
-      const tUrl = transcriptionUrlFromOutput(out)
-      if (!tUrl) {
-        console.error('[QwenASR] SUCCEEDED but no transcription_url:', pollRes.data)
-        throw new Error('Qwen ASR: missing transcription_url')
-      }
-      const jsonRes = await axios.get(tUrl, {
-        timeout: SUBMIT_TIMEOUT_MS,
-        validateStatus: (s) => s === 200,
-        responseType: 'json',
-      })
-      const text = textFromTranscriptionResultJson(jsonRes.data)
-      return {
-        text,
-        id: taskId,
-        created: Date.now(),
-        model: DASHSCOPE.QWEN_ASR_MODEL,
-      }
-    }
-
-    if (taskStatus === 'FAILED') {
-      const msg =
-        (typeof out.message === 'string' && out.message) ||
-        (typeof out.code === 'string' && out.code) ||
-        'FAILED'
-      throw new Error(`Qwen ASR: ${msg}`)
-    }
-
-    if (taskStatus === 'UNKNOWN') {
-      throw new Error('Qwen ASR: task UNKNOWN')
-    }
-
-    await sleep(POLL_INTERVAL_MS)
-  }
-
-  throw new Error('Qwen ASR: task polling timeout')
 }
 
 /**
- * 用不存在的 task id 探测鉴权：有效 Key 通常返回 200 且 `output.task_status` 为 `UNKNOWN`。
+ * 探测 DashScope 同步接口是否可达且 Key 有效：故意省略必填字段，期望 400（非 401/403）。
  */
 export async function testQwenDashScopeConnection(config: ASRConfig): Promise<boolean> {
   const apiKey = config.qwenApiKey?.trim()
   if (!apiKey) return false
 
-  const base = dashscopeBase(config.qwenRegion)
-  const url = `${base}/api/v1/tasks/00000000-0000-0000-0000-000000000000`
+  const url = qwenMultimodalGenerationUrl(config.qwenRegion)
+  const model = qwenShortAsrModelName(config.qwenRegion)
 
   try {
-    const res = await axios.get(url, {
-      headers: dashscopeAsyncHeaders(apiKey),
-      timeout: 15_000,
-      validateStatus: () => true,
-    })
+    const res = await axios.post(
+      url,
+      { model },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 15_000,
+        validateStatus: () => true,
+      },
+    )
     if (res.status === 401 || res.status === 403) return false
-    const out = getOutput(res.data)
-    return res.status === 200 && !!out && typeof out.task_status === 'string'
+    if (res.status === 400) return true
+    if (res.status === 200) return true
+    return false
   } catch {
     return false
   }

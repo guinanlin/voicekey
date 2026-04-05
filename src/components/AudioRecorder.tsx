@@ -1,4 +1,57 @@
 import { useEffect, useRef } from 'react'
+import {
+  AUDIO_CAPTURE_OPUS_BITRATE_MAX,
+  AUDIO_CAPTURE_OPUS_BITRATE_MIN,
+  DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+} from '@electron/shared/constants'
+import type { AudioCapturePreferences } from '@electron/shared/types'
+
+function clampOpusBitrate(bps: number): number {
+  return Math.min(
+    AUDIO_CAPTURE_OPUS_BITRATE_MAX,
+    Math.max(AUDIO_CAPTURE_OPUS_BITRATE_MIN, Math.round(bps)),
+  )
+}
+
+async function acquireMicStream(prefs: AudioCapturePreferences): Promise<MediaStream> {
+  const usePlainAudio = !prefs.preferMono && !prefs.echoCancellation && !prefs.noiseSuppression
+
+  if (usePlainAudio) {
+    return navigator.mediaDevices.getUserMedia({ audio: true })
+  }
+
+  const audio: MediaTrackConstraints = {
+    ...(prefs.preferMono ? { channelCount: { ideal: 1 } } : {}),
+    echoCancellation: prefs.echoCancellation,
+    noiseSuppression: prefs.noiseSuppression,
+  }
+
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio })
+  } catch (e) {
+    if (prefs.fallbackOnMicConstraintFailure) {
+      return navigator.mediaDevices.getUserMedia({ audio: true })
+    }
+    throw e
+  }
+}
+
+function createMediaRecorder(
+  stream: MediaStream,
+  mimeType: string,
+  opusBitsPerSecond: number,
+): MediaRecorder {
+  const bits = clampOpusBitrate(opusBitsPerSecond)
+  const withMime = mimeType ? { mimeType } : {}
+  try {
+    return new MediaRecorder(stream, {
+      ...withMime,
+      audioBitsPerSecond: bits,
+    })
+  } catch {
+    return new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+  }
+}
 
 export function AudioRecorder() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -67,7 +120,13 @@ export function AudioRecorder() {
 
         isRecordingRef.current = true
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const fullConfig = await window.electronAPI.getConfig()
+        const ac: AudioCapturePreferences = {
+          ...DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+          ...(fullConfig.app.audioCapture ?? {}),
+        }
+
+        const stream = await acquireMicStream(ac)
         streamRef.current = stream // 保存引用
 
         const audioContext = new AudioContext()
@@ -107,7 +166,7 @@ export function AudioRecorder() {
         }
 
         const mimeType = pickRecorderMimeType()
-        const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+        const mediaRecorder = createMediaRecorder(stream, mimeType, ac.opusBitsPerSecond)
         mediaRecorderRef.current = mediaRecorder
         chunksRef.current = []
 

@@ -1,7 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, XCircle, AlertTriangle, Eye, EyeOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { DASHSCOPE, ERPNEXTCN_DTY } from '@electron/shared/constants'
+import {
+  AUDIO_CAPTURE_OPUS_BITRATE_OPTIONS,
+  DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+  ERPNEXTCN_DTY,
+  qwenMultimodalGenerationUrl,
+  qwenShortAsrModelName,
+} from '@electron/shared/constants'
 import { resolveLanguage, type LanguageSetting } from '@electron/shared/i18n'
 import type { AppConfig, UpdateInfo } from '@electron/shared/types'
 import { HotkeySettings } from '@/components/HotkeySettings'
@@ -25,6 +31,8 @@ export default function SettingsPage() {
   const [config, setConfig] = useState<AppConfig>({
     app: {
       language: 'system',
+      autoLaunch: false,
+      audioCapture: { ...DEFAULT_AUDIO_CAPTURE_PREFERENCES },
     },
     asr: {
       provider: 'glm',
@@ -193,9 +201,17 @@ export default function SettingsPage() {
 
   const currentRegion = config.asr.region || 'cn'
   const currentApiKey = config.asr.apiKeys?.[currentRegion] || ''
-  const qwenDashscopeSubmitUrl = `${
-    config.asr.qwenRegion === 'intl' ? DASHSCOPE.BASE_INTL : DASHSCOPE.BASE_CN
-  }/api/v1/services/audio/asr/transcription`
+  const qwenDashscopeSubmitUrl = qwenMultimodalGenerationUrl(config.asr.qwenRegion)
+
+  const opusBitrateSelectModel = useMemo(() => {
+    const value =
+      config.app.audioCapture?.opusBitsPerSecond ??
+      DEFAULT_AUDIO_CAPTURE_PREFERENCES.opusBitsPerSecond
+    const presets = [...AUDIO_CAPTURE_OPUS_BITRATE_OPTIONS]
+    const inList = presets.includes(value as (typeof AUDIO_CAPTURE_OPUS_BITRATE_OPTIONS)[number])
+    const items = inList ? presets : [...presets, value].sort((a, b) => a - b)
+    return { value, items }
+  }, [config.app.audioCapture?.opusBitsPerSecond])
 
   // Update Logic
   const [checkingUpdate, setCheckingUpdate] = useState(false)
@@ -431,6 +447,178 @@ export default function SettingsPage() {
                   className="no-drag cursor-pointer"
                 />
               </div>
+
+              <div className="border-t border-border pt-4 space-y-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{t('settings.audioCaptureSectionTitle')}</p>
+                  <Alert className="border-muted-foreground/25 bg-muted/40">
+                    <AlertDescription className="text-sm text-muted-foreground">
+                      {t('settings.audioCaptureRecommendedHint')}
+                    </AlertDescription>
+                  </Alert>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="opusBitrate">{t('settings.audioCaptureBitrateLabel')}</Label>
+                  <Select
+                    value={String(opusBitrateSelectModel.value)}
+                    onValueChange={(value) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        app: {
+                          ...prev.app,
+                          audioCapture: {
+                            ...DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+                            ...prev.app.audioCapture,
+                            opusBitsPerSecond: Number(value),
+                          },
+                        },
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="opusBitrate" className="no-drag w-full cursor-pointer">
+                      <SelectValue placeholder={t('settings.languagePlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {opusBitrateSelectModel.items.map((bps) => (
+                        <SelectItem key={bps} value={String(bps)}>
+                          {t('settings.audioCaptureBitrateOption', { kbps: bps / 1000 })}
+                          {bps === DEFAULT_AUDIO_CAPTURE_PREFERENCES.opusBitsPerSecond
+                            ? ` (${t('settings.audioCaptureBitrateRecommended')})`
+                            : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {t('settings.audioCaptureBitrateHelp')}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between space-x-2">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="preferMono">{t('settings.audioCapturePreferMono')}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.audioCapturePreferMonoHelp')}
+                    </p>
+                  </div>
+                  <Switch
+                    id="preferMono"
+                    checked={
+                      config.app.audioCapture?.preferMono ??
+                      DEFAULT_AUDIO_CAPTURE_PREFERENCES.preferMono
+                    }
+                    onCheckedChange={(checked) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        app: {
+                          ...prev.app,
+                          audioCapture: {
+                            ...DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+                            ...prev.app.audioCapture,
+                            preferMono: checked,
+                          },
+                        },
+                      }))
+                    }
+                    className="no-drag cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between space-x-2">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="echoCancellation">
+                      {t('settings.audioCaptureEchoCancellation')}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.audioCaptureEchoCancellationHelp')}
+                    </p>
+                  </div>
+                  <Switch
+                    id="echoCancellation"
+                    checked={
+                      config.app.audioCapture?.echoCancellation ??
+                      DEFAULT_AUDIO_CAPTURE_PREFERENCES.echoCancellation
+                    }
+                    onCheckedChange={(checked) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        app: {
+                          ...prev.app,
+                          audioCapture: {
+                            ...DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+                            ...prev.app.audioCapture,
+                            echoCancellation: checked,
+                          },
+                        },
+                      }))
+                    }
+                    className="no-drag cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between space-x-2">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="noiseSuppression">
+                      {t('settings.audioCaptureNoiseSuppression')}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.audioCaptureNoiseSuppressionHelp')}
+                    </p>
+                  </div>
+                  <Switch
+                    id="noiseSuppression"
+                    checked={
+                      config.app.audioCapture?.noiseSuppression ??
+                      DEFAULT_AUDIO_CAPTURE_PREFERENCES.noiseSuppression
+                    }
+                    onCheckedChange={(checked) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        app: {
+                          ...prev.app,
+                          audioCapture: {
+                            ...DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+                            ...prev.app.audioCapture,
+                            noiseSuppression: checked,
+                          },
+                        },
+                      }))
+                    }
+                    className="no-drag cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between space-x-2">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="micFallback">{t('settings.audioCaptureMicFallback')}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.audioCaptureMicFallbackHelp')}
+                    </p>
+                  </div>
+                  <Switch
+                    id="micFallback"
+                    checked={
+                      config.app.audioCapture?.fallbackOnMicConstraintFailure ??
+                      DEFAULT_AUDIO_CAPTURE_PREFERENCES.fallbackOnMicConstraintFailure
+                    }
+                    onCheckedChange={(checked) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        app: {
+                          ...prev.app,
+                          audioCapture: {
+                            ...DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+                            ...prev.app.audioCapture,
+                            fallbackOnMicConstraintFailure: checked,
+                          },
+                        },
+                      }))
+                    }
+                    className="no-drag cursor-pointer"
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -572,13 +760,13 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label htmlFor="qwenRegion">{t('settings.qwenDashscopeRegion')}</Label>
                   <Select
-                    value={config.asr.qwenRegion === 'intl' ? 'intl' : 'cn'}
+                    value={config.asr.qwenRegion ?? 'cn'}
                     onValueChange={(value) =>
                       setConfig((prev) => ({
                         ...prev,
                         asr: {
                           ...prev.asr,
-                          qwenRegion: value as 'cn' | 'intl',
+                          qwenRegion: value as 'cn' | 'intl' | 'us',
                         },
                       }))
                     }
@@ -589,6 +777,7 @@ export default function SettingsPage() {
                     <SelectContent>
                       <SelectItem value="cn">{t('settings.qwenRegionCn')}</SelectItem>
                       <SelectItem value="intl">{t('settings.qwenRegionIntl')}</SelectItem>
+                      <SelectItem value="us">{t('settings.qwenRegionUs')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -603,7 +792,7 @@ export default function SettingsPage() {
                     className="no-drag bg-muted text-muted-foreground"
                   />
                   <p className="text-sm text-muted-foreground">
-                    {t('settings.qwenModelLabel')}: {DASHSCOPE.QWEN_ASR_MODEL}
+                    {t('settings.qwenModelLabel')}: {qwenShortAsrModelName(config.asr.qwenRegion)}
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -654,6 +843,11 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">{t('settings.erpnextcnHelp')}</p>
+              <Alert className="border-muted-foreground/25 bg-muted/40">
+                <AlertDescription className="text-sm text-muted-foreground">
+                  {t('settings.storageLinkedToAudioHint')}
+                </AlertDescription>
+              </Alert>
               <div className="space-y-2">
                 <Label htmlFor="erpnextcnHost">{t('settings.erpnextcnHost')}</Label>
                 <Input
