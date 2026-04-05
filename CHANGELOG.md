@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.31](https://github.com/guinanlin/voicekey/compare/v0.2.30...v0.2.31) (2026-04-05)
+
+### Features
+
+- switch Qwen ASR to sync multimodal API and add audio capture settings ([8f83d56](https://github.com/guinanlin/voicekey/commit/8f83d560a265e4ebf83f534d444f8ae9aec90368))
+
 ### [0.2.30](https://github.com/guinanlin/voicekey/compare/v0.2.29...v0.2.30) (2026-04-03)
 
 ### [0.2.29](https://github.com/guinanlin/voicekey/compare/v0.2.28...v0.2.29) (2026-04-02)
