@@ -26,15 +26,16 @@ export function HUD() {
   }, [])
 
   useEffect(() => {
-    const removeOverlayUpdateListener = window.electronAPI.onOverlayUpdate(
-      (state: OverlayState) => {
-        setStatus(state.status)
-        setMessage(state.message ?? '')
-        setNoTextInjected(state.noTextInjected ?? false)
-      },
-    )
+    const api = window.electronAPI
+    if (!api) return
 
-    const removeAudioLevelListener = window.electronAPI.onAudioLevel((level: number) => {
+    const removeOverlayUpdateListener = api.onOverlayUpdate((state: OverlayState) => {
+      setStatus(state.status)
+      setMessage(state.message ?? '')
+      setNoTextInjected(state.noTextInjected ?? false)
+    })
+
+    const removeAudioLevelListener = api.onAudioLevel((level: number) => {
       setAudioLevel(level)
     })
 
@@ -98,13 +99,13 @@ export function HUD() {
 
   const handleCancel = () => {
     if (status === 'recording') {
-      window.electronAPI.stopSession()
+      void window.electronAPI?.stopSession?.()
     }
   }
 
   const handleConfirm = () => {
     if (status === 'recording') {
-      window.electronAPI.stopSession()
+      void window.electronAPI?.stopSession?.()
     }
   }
 
@@ -121,8 +122,8 @@ export function HUD() {
           transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]
           ${isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95'}
         `}
-        onMouseEnter={() => window.electronAPI.setIgnoreMouseEvents(false)}
-        onMouseLeave={() => window.electronAPI.setIgnoreMouseEvents(true, { forward: true })}
+        onMouseEnter={() => window.electronAPI?.setIgnoreMouseEvents?.(false)}
+        onMouseLeave={() => window.electronAPI?.setIgnoreMouseEvents?.(true, { forward: true })}
       >
         {/* Status Orb / Icon - 左侧状态球 */}
         <div

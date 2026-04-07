@@ -37,6 +37,8 @@ export interface ASRConfig {
 
 export interface HotkeyConfig {
   pttKey: string
+  flashNoteStart: string
+  flashNoteEnd: string
   toggleSettings: string
 }
 

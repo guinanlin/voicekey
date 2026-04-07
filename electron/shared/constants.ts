@@ -19,6 +19,8 @@ const isDarwin =
 
 export const DEFAULT_HOTKEYS = {
   PTT: isDarwin ? 'Alt' : 'Control+Shift+Space',
+  FLASH_NOTE_START: isDarwin ? 'Command+Shift+9' : 'Control+Shift+9',
+  FLASH_NOTE_END: isDarwin ? 'Command+Shift+0' : 'Control+Shift+0',
   SETTINGS: isDarwin ? 'Command+Shift+,' : 'Control+Shift+,',
 } as const
 

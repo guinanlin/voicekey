@@ -48,6 +48,8 @@ const defaultConfig: AppConfig = {
   },
   hotkey: {
     pttKey: DEFAULT_HOTKEYS.PTT,
+    flashNoteStart: DEFAULT_HOTKEYS.FLASH_NOTE_START,
+    flashNoteEnd: DEFAULT_HOTKEYS.FLASH_NOTE_END,
     toggleSettings: DEFAULT_HOTKEYS.SETTINGS,
   },
   erpnextcnDty: {
@@ -173,7 +175,11 @@ export class ConfigManager {
 
   // 获取快捷键配置
   getHotkeyConfig(): HotkeyConfig {
-    return this.store.get('hotkey', defaultConfig.hotkey)
+    const raw = this.store.get('hotkey', defaultConfig.hotkey)
+    return {
+      ...defaultConfig.hotkey,
+      ...raw,
+    }
   }
 
   // 设置快捷键配置

@@ -146,7 +146,9 @@ export function buildAccelerator(keys: Set<string>): string {
 export function formatHotkey(accelerator: string, fallback = ''): string {
   if (!accelerator) return fallback
 
-  const isMac = window.electronAPI?.platform === 'darwin'
+  const isMac =
+    window.electronAPI?.platform === 'darwin' ||
+    (window.electronAPI === undefined && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent))
 
   if (isMac) {
     return accelerator

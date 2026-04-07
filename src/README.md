@@ -16,5 +16,5 @@
 - `main.tsx` - React 启动与渲染入口，初始化 i18n 并挂载 Toaster。
 - `i18n.ts` - 渲染进程 i18next 初始化，读取配置并加载共享语言资源。
 - `index.css` - Tailwind 基础样式与主题变量。
-- `global.d.ts` - `window.electronAPI` 类型声明。
+- `global.d.ts` - `window.electronAPI` 类型声明（可选：纯浏览器打开 dev 地址时不存在）。
 - `vite-env.d.ts` - Vite 环境类型声明。

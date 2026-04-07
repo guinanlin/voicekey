@@ -24,8 +24,8 @@ export default function HomePage() {
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const loadedConfig = await window.electronAPI.getConfig()
-        setConfig(loadedConfig)
+        const loadedConfig = await window.electronAPI?.getConfig?.()
+        if (loadedConfig) setConfig(loadedConfig)
       } catch (error) {
         // eslint-disable-next-line no-console -- report config load failure
         console.error('Failed to load config:', error)
@@ -35,10 +35,16 @@ export default function HomePage() {
   }, [])
 
   useEffect(() => {
+    const api = window.electronAPI
+    if (!api) {
+      setLoading(false)
+      return
+    }
+
     const loadHistory = async () => {
       try {
         setLoading(true)
-        const data = await window.electronAPI.getHistory()
+        const data = await api.getHistory()
         setHistoryItems(data)
       } catch (error) {
         // eslint-disable-next-line no-console -- report history load failure
@@ -47,11 +53,10 @@ export default function HomePage() {
         setLoading(false)
       }
     }
-    loadHistory()
-    const unsub = window.electronAPI.onHistoryChanged(() => {
+    void loadHistory()
+    return api.onHistoryChanged(() => {
       void loadHistory()
     })
-    return unsub
   }, [])
 
   return (

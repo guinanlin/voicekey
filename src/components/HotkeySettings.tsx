@@ -19,17 +19,17 @@ import {
   type HotkeyValidationMessage,
   validateHotkey,
 } from '@/lib/hotkey-utils'
-
-interface HotkeyConfig {
-  pttKey: string
-  toggleSettings: string
-}
+import type { HotkeyConfig } from '@electron/shared/types'
 
 // 渲染进程默认值，与 electron/shared/constants.ts 保持一致  后面配置到 constants.ts
 const getDefaultHotkeys = (): HotkeyConfig => {
-  const isMac = window.electronAPI?.platform === 'darwin'
+  const isMac =
+    window.electronAPI?.platform === 'darwin' ||
+    (window.electronAPI === undefined && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent))
   return {
     pttKey: isMac ? 'Alt' : 'Control+Shift+Space',
+    flashNoteStart: isMac ? 'Command+Shift+9' : 'Control+Shift+9',
+    flashNoteEnd: isMac ? 'Command+Shift+0' : 'Control+Shift+0',
     toggleSettings: isMac ? 'Command+Shift+,' : 'Control+Shift+,',
   }
 }
@@ -38,6 +38,8 @@ export function HotkeySettings() {
   const { t } = useTranslation()
   const [config, setConfig] = useState<HotkeyConfig>({
     pttKey: '',
+    flashNoteStart: '',
+    flashNoteEnd: '',
     toggleSettings: '',
   })
   const [originalConfig, setOriginalConfig] = useState<HotkeyConfig | null>(null)
@@ -49,9 +51,15 @@ export function HotkeySettings() {
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const cfg = await window.electronAPI.getConfig()
-        setConfig(cfg.hotkey)
-        setOriginalConfig(cfg.hotkey)
+        const cfg = await window.electronAPI?.getConfig?.()
+        if (cfg) {
+          setConfig(cfg.hotkey)
+          setOriginalConfig(cfg.hotkey)
+        } else {
+          const defaults = getDefaultHotkeys()
+          setConfig(defaults)
+          setOriginalConfig(null)
+        }
       } catch (error) {
         // eslint-disable-next-line no-console -- report config load failure
         console.error('Failed to load config:', error)
@@ -66,12 +74,14 @@ export function HotkeySettings() {
   const isDirty =
     originalConfig &&
     (config.pttKey !== originalConfig.pttKey ||
+      config.flashNoteStart !== originalConfig.flashNoteStart ||
+      config.flashNoteEnd !== originalConfig.flashNoteEnd ||
       config.toggleSettings !== originalConfig.toggleSettings)
 
   const getValidationMessage = (messageKey?: HotkeyValidationMessage) =>
     messageKey ? t(`hotkey.validation.${messageKey}`) : t('hotkey.validation.missing')
 
-  const handleHotkeyChange = (key: 'pttKey' | 'toggleSettings', value: string) => {
+  const handleHotkeyChange = (key: keyof HotkeyConfig, value: string) => {
     const validation = validateHotkey(value)
 
     if (!validation.valid) {
@@ -85,8 +95,10 @@ export function HotkeySettings() {
       return
     }
 
-    const otherKey = key === 'pttKey' ? 'toggleSettings' : 'pttKey'
-    if (value === config[otherKey]) {
+    const duplicated = (Object.keys(config) as (keyof HotkeyConfig)[]).some(
+      (k) => k !== key && config[k] === value,
+    )
+    if (duplicated) {
       const message = t('hotkey.toast.duplicateDesc')
       setErrors((prev) => ({ ...prev, [key]: message }))
       toast.error(t('hotkey.toast.duplicate'), { description: message })
@@ -99,15 +111,28 @@ export function HotkeySettings() {
 
   const handleSave = async () => {
     const pttValidation = validateHotkey(config.pttKey)
+    const flashNoteStartValidation = validateHotkey(config.flashNoteStart)
+    const flashNoteEndValidation = validateHotkey(config.flashNoteEnd)
     const settingsValidation = validateHotkey(config.toggleSettings)
 
-    if (!pttValidation.valid || !settingsValidation.valid) {
+    if (
+      !pttValidation.valid ||
+      !flashNoteStartValidation.valid ||
+      !flashNoteEndValidation.valid ||
+      !settingsValidation.valid
+    ) {
       toast.error(t('hotkey.toast.fix'))
       return
     }
 
     setIsSaving(true)
     try {
+      if (!window.electronAPI?.setConfig) {
+        toast.error(t('hotkey.toast.saveFailed'), {
+          description: t('common.unknownError'),
+        })
+        return
+      }
       await window.electronAPI.setConfig({ hotkey: config })
       setOriginalConfig(config)
       toast.success(t('hotkey.toast.updated'), {
@@ -217,6 +242,28 @@ export function HotkeySettings() {
             />
           )}
         </div>
+
+        <div className="border-t border-border" />
+
+        <HotkeyRecorder
+          label={t('hotkey.flashNoteStartLabel')}
+          value={config.flashNoteStart}
+          onChange={(value) => handleHotkeyChange('flashNoteStart', value)}
+          description={t('hotkey.flashNoteStartHint')}
+          hasError={!!errors.flashNoteStart}
+          errorMessage={errors.flashNoteStart}
+        />
+
+        <div className="border-t border-border" />
+
+        <HotkeyRecorder
+          label={t('hotkey.flashNoteEndLabel')}
+          value={config.flashNoteEnd}
+          onChange={(value) => handleHotkeyChange('flashNoteEnd', value)}
+          description={t('hotkey.flashNoteEndHint')}
+          hasError={!!errors.flashNoteEnd}
+          errorMessage={errors.flashNoteEnd}
+        />
 
         <div className="border-t border-border" />
 

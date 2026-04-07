@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import MainLayout from './layouts/MainLayout'
 import HomePage from './pages/HomePage'
+import SketchesPage from './pages/SketchesPage'
 import SettingsPage from './pages/SettingsPage'
 import HistoryPage from './pages/HistoryPage'
 import { AudioRecorder } from './components/AudioRecorder'
@@ -18,7 +19,10 @@ function App() {
   }, [])
 
   const isMainWindow =
-    currentRoute === '/settings' || currentRoute === '/home' || currentRoute === '/history'
+    currentRoute === '/settings' ||
+    currentRoute === '/home' ||
+    currentRoute === '/history' ||
+    currentRoute === '/sketches'
   useEffect(() => {
     if (isMainWindow) {
       document.body.classList.add('main-window')
@@ -46,6 +50,8 @@ function App() {
         return <SettingsPage />
       case '/history':
         return <HistoryPage />
+      case '/sketches':
+        return <SketchesPage />
       case '/home':
       default:
         return <HomePage />

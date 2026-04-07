@@ -48,6 +48,8 @@ export default function SettingsPage() {
     },
     hotkey: {
       pttKey: '',
+      flashNoteStart: '',
+      flashNoteEnd: '',
       toggleSettings: '',
     },
     erpnextcnDty: {
@@ -74,7 +76,8 @@ export default function SettingsPage() {
 
     const loadConfig = async () => {
       try {
-        const loadedConfig = await window.electronAPI.getConfig()
+        const loadedConfig = await window.electronAPI?.getConfig?.()
+        if (!loadedConfig) return
         setConfig(loadedConfig)
         const resolvedLanguage = resolveLanguage(
           loadedConfig.app?.language ?? 'system',
@@ -101,19 +104,26 @@ export default function SettingsPage() {
     }))
     const resolvedLanguage = resolveLanguage(setting, navigator.language)
     void i18n.changeLanguage(resolvedLanguage)
-    void window.electronAPI.setConfig({ app: { language: setting } }).catch((error) => {
-      // eslint-disable-next-line no-console -- report persist failure
-      console.error('Failed to persist app language:', error)
-    })
+    const persist = window.electronAPI?.setConfig?.({ app: { language: setting } })
+    if (persist) {
+      void persist.catch((error) => {
+        // eslint-disable-next-line no-console -- report persist failure
+        console.error('Failed to persist app language:', error)
+      })
+    }
   }
 
   const handleSave = async () => {
     setSaving(true)
     setTestResult(null)
     try {
-      const latestConfig = await window.electronAPI.getConfig()
+      const api = window.electronAPI
+      if (!api) {
+        throw new Error('Electron API unavailable')
+      }
+      const latestConfig = await api.getConfig()
 
-      await window.electronAPI.setConfig({
+      await api.setConfig({
         ...latestConfig,
         app: config.app,
         asr: config.asr,
@@ -151,6 +161,11 @@ export default function SettingsPage() {
     setTesting(true)
     setTestResult(null)
     try {
+      if (!window.electronAPI?.testConnection) {
+        setTestResult({ type: 'error', message: t('settings.result.connectionFailed') })
+        setTesting(false)
+        return
+      }
       const result = await window.electronAPI.testConnection(config.asr)
       if (result) {
         setTestResult({ type: 'success', message: t('settings.result.connectionSuccess') })
@@ -224,9 +239,15 @@ export default function SettingsPage() {
     if (hasLoadedUpdateStatus.current) return
     hasLoadedUpdateStatus.current = true
 
+    const api = window.electronAPI
+    if (!api) {
+      setIsPackaged(false)
+      return
+    }
+
     const loadUpdateStatus = async () => {
       try {
-        const info = await window.electronAPI.getUpdateStatus()
+        const info = await api.getUpdateStatus()
         if (info) {
           setUpdateInfo(info)
         }
@@ -236,16 +257,16 @@ export default function SettingsPage() {
       }
     }
 
-    loadUpdateStatus()
+    void loadUpdateStatus()
 
     // 检查是否是打包版本
-    window.electronAPI
+    void api
       .getIsPackaged()
       .then(setIsPackaged)
       .catch(() => setIsPackaged(true))
 
     // 监听更新事件
-    const unsubscribeProgress = window.electronAPI.onUpdateDownloadProgress((progress) => {
+    const unsubscribeProgress = api.onUpdateDownloadProgress((progress) => {
       setUpdateInfo((prev) =>
         prev
           ? {
@@ -257,7 +278,7 @@ export default function SettingsPage() {
       )
     })
 
-    const unsubscribeAvailable = window.electronAPI.onUpdateAvailable((event, data) => {
+    const unsubscribeAvailable = api.onUpdateAvailable((event, data) => {
       if (data) {
         setUpdateInfo(data)
       }
@@ -279,6 +300,17 @@ export default function SettingsPage() {
     setCheckingUpdate(true)
     setUpdateInfo(null)
     try {
+      if (!window.electronAPI?.checkForUpdates) {
+        setUpdateInfo({
+          hasUpdate: false,
+          latestVersion: '',
+          releaseUrl: '',
+          releaseNotes: '',
+          error: 'failed',
+          status: 'error',
+        })
+        return
+      }
       const info = await window.electronAPI.checkForUpdates()
       setUpdateInfo(info)
     } catch (error) {
@@ -302,6 +334,10 @@ export default function SettingsPage() {
 
     setDownloadingUpdate(true)
     try {
+      if (!window.electronAPI?.downloadUpdate) {
+        setDownloadingUpdate(false)
+        return
+      }
       const result = await window.electronAPI.downloadUpdate()
       if (!result.success) {
         setUpdateInfo((prev) =>
@@ -335,6 +371,10 @@ export default function SettingsPage() {
   const handleInstallUpdate = async () => {
     setInstallingUpdate(true)
     try {
+      if (!window.electronAPI?.installUpdate) {
+        setInstallingUpdate(false)
+        return
+      }
       const result = await window.electronAPI.installUpdate()
       if (!result.success) {
         // eslint-disable-next-line no-console -- report install failure
@@ -368,8 +408,11 @@ export default function SettingsPage() {
   }
 
   const handleOpenRelease = () => {
-    if (updateInfo?.releaseUrl) {
-      window.electronAPI.openExternal(updateInfo.releaseUrl)
+    const url = updateInfo?.releaseUrl
+    if (!url) return
+    void window.electronAPI?.openExternal?.(url)
+    if (!window.electronAPI?.openExternal) {
+      window.open(url, '_blank', 'noopener,noreferrer')
     }
   }
 
@@ -406,7 +449,7 @@ export default function SettingsPage() {
             value="about"
             className="h-7 flex-none px-3 py-1 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
-            {t('settings.about')}
+            {t('settings.aboutTab')}
           </TabsTrigger>
         </TabsList>
 

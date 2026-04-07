@@ -23,8 +23,8 @@ export default function ServiceStatusCard() {
   useEffect(() => {
     const fetchLocalIP = async () => {
       try {
-        const ip = await window.electronAPI.getLocalIP()
-        setLocalIP(ip)
+        const ip = await window.electronAPI?.getLocalIP?.()
+        if (ip) setLocalIP(ip)
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Failed to get local IP:', error)

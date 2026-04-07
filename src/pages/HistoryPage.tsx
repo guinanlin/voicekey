@@ -71,8 +71,8 @@ export default function HistoryPage() {
   const loadHistory = React.useCallback(async () => {
     try {
       setLoading(true)
-      const data = await window.electronAPI.getHistory()
-      setItems(data)
+      const data = await window.electronAPI?.getHistory?.()
+      setItems(data ?? [])
     } catch (error) {
       // eslint-disable-next-line no-console -- report history load failure
       console.error('Failed to load history:', error)
@@ -87,10 +87,11 @@ export default function HistoryPage() {
   }, [loadHistory])
 
   React.useEffect(() => {
-    const unsub = window.electronAPI.onHistoryChanged(() => {
+    const api = window.electronAPI
+    if (!api) return
+    return api.onHistoryChanged(() => {
       void loadHistory()
     })
-    return unsub
   }, [loadHistory])
 
   const filteredItems = React.useMemo(() => {
@@ -127,6 +128,7 @@ export default function HistoryPage() {
   const deleteItem = React.useCallback(
     async (id: string) => {
       try {
+        if (!window.electronAPI?.deleteHistoryItem) return
         await window.electronAPI.deleteHistoryItem(id)
         setItems((prev) => prev.filter((item) => item.id !== id))
         toast.success(t('history.deleteSuccess'))
@@ -142,6 +144,7 @@ export default function HistoryPage() {
   const clearAll = React.useCallback(async () => {
     if (!window.confirm(t('history.clearConfirm'))) return
     try {
+      if (!window.electronAPI?.clearHistory) return
       await window.electronAPI.clearHistory()
       setItems([])
       toast.success(t('history.clearSuccess'))

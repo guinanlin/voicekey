@@ -101,12 +101,13 @@ export function AudioRecorder() {
   }
 
   useEffect(() => {
-    if (!window.electronAPI) {
+    const api = window.electronAPI
+    if (!api) {
       // 非 Electron 环境（如纯浏览器访问 localhost）时 electronAPI 不存在，跳过注册
       return
     }
 
-    window.electronAPI.onStartRecording(async () => {
+    api.onStartRecording(async () => {
       // 录音状态守卫：防止重复录音
       if (isRecordingRef.current) {
         // eslint-disable-next-line no-console -- debug duplicate start
@@ -120,7 +121,7 @@ export function AudioRecorder() {
 
         isRecordingRef.current = true
 
-        const fullConfig = await window.electronAPI.getConfig()
+        const fullConfig = await api.getConfig()
         const ac: AudioCapturePreferences = {
           ...DEFAULT_AUDIO_CAPTURE_PREFERENCES,
           ...(fullConfig.app.audioCapture ?? {}),
@@ -150,7 +151,7 @@ export function AudioRecorder() {
           const sum = dataArray.reduce((a, b) => a + b, 0)
           const average = sum / dataArray.length
           const normalized = Math.min(average / 128, 1)
-          window.electronAPI.sendAudioLevel(normalized)
+          api.sendAudioLevel(normalized)
           animationFrameRef.current = requestAnimationFrame(sendAudioLevel)
         }
         sendAudioLevel()
@@ -185,7 +186,7 @@ export function AudioRecorder() {
             type: mimeType || mediaRecorder.mimeType || 'audio/webm',
           })
           const buffer = await blob.arrayBuffer()
-          window.electronAPI.sendAudioData(buffer)
+          api.sendAudioData(buffer)
 
           // 释放所有资源
           releaseResources()
@@ -196,7 +197,7 @@ export function AudioRecorder() {
         mediaRecorder.onerror = (e) => {
           // eslint-disable-next-line no-console -- record recorder error
           console.error('[Renderer] MediaRecorder error:', e)
-          window.electronAPI.sendError(`MediaRecorder error: ${e}`)
+          api.sendError(`MediaRecorder error: ${e}`)
           // 错误时也释放资源
           releaseResources()
         }
@@ -207,13 +208,13 @@ export function AudioRecorder() {
       } catch (err) {
         // eslint-disable-next-line no-console -- report mic access failure
         console.error('[Renderer] Failed to start recording:', err)
-        window.electronAPI.sendError(`Failed to access microphone: ${err}`)
+        api.sendError(`Failed to access microphone: ${err}`)
         // 启动失败也要释放
         releaseResources()
       }
     })
 
-    window.electronAPI.onStopRecording(() => {
+    api.onStopRecording(() => {
       // eslint-disable-next-line no-console -- debug stop trigger
       console.log('[Renderer] onStopRecording triggered')
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {

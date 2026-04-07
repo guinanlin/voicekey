@@ -5,8 +5,41 @@
   },
   "nav": {
     "home": "Home",
+    "sketches": "Flash Notes",
     "settings": "Settings",
     "history": "History"
+  },
+  "sketches": {
+    "start": "Start",
+    "end": "End",
+    "idLabel": "Flash note ID",
+    "idCaption": "Flash note",
+    "idPlaceholder": "Filter by ID…",
+    "startedAtLabel": "Started",
+    "recordingStatus": "Recording",
+    "elapsedLabel": "Elapsed",
+    "liveClockLabel": "Current time",
+    "duringRecordingSidebar": "This session is still open. Segments appear after you tap End.",
+    "duringRecordingRight": "Session in progress. End to finalize this ID and view summary or details here.",
+    "recordTitle": "Flash note ID {{id}}",
+    "summaryAiButton": "Summarize",
+    "summaryPromptLabel": "Summary prompt",
+    "summaryPromptDefault": "You are an expert at turning voice and meeting transcripts into clear notes. Summarize every recording under this flash note: keep facts and decisions, do not invent content, use short headings and bullet points.",
+    "summaryQueuedToast": "Summary request recorded (API not wired yet).",
+    "summaryNeedEndFirst": "End the current session before summarizing.",
+    "summaryNoSegments": "No segments under this note; nothing to summarize.",
+    "recordingFile": "Recording file {{n}}",
+    "tabSummary": "Summary",
+    "tabDetails": "Details",
+    "noSegmentSelected": "Select a segment on the left to see summary and details.",
+    "summaryIntro": "AI summary, audit conclusions, or highlights for the selected segment will appear here.",
+    "detailsIntro": "Transcripts, metadata, and key markers will appear here."
+  },
+  "layout": {
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebarTooltip": "Hide sidebar ({{shortcut}})",
+    "expandSidebarTooltip": "Show sidebar ({{shortcut}})"
   },
   "common": {
     "loading": "Loading...",
@@ -51,6 +84,7 @@
   },
   "settings": {
     "title": "Settings",
+    "aboutTab": "About",
     "about": "About Voice Key",
     "version": "Current Version: v{{version}}",
     "checkUpdate": "Check for Updates",
@@ -138,13 +172,17 @@
     }
   },
   "hotkey": {
-    "title": "Hotkey Settings",
+    "title": "Hotkeys",
     "description": "Configure global hotkeys to control recording and open settings",
     "pttLabel": "Recording hotkey (Push-to-Talk)",
     "preset": "Preset",
     "custom": "Custom",
     "select": "Select a hotkey",
     "pttHint": "Hold to record, release to stop and send",
+    "flashNoteStartLabel": "Flash note start hotkey",
+    "flashNoteStartHint": "Press this hotkey to start a new flash note",
+    "flashNoteEndLabel": "Flash note end hotkey",
+    "flashNoteEndHint": "Press this hotkey to end the current flash note",
     "settingsLabel": "Open settings window",
     "settingsHint": "Press this hotkey to open or close the settings window",
     "reset": "Reset to default",

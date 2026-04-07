@@ -148,7 +148,7 @@ function createSettingsWindow() {
     title: t('window.settingsTitle'),
     // 统一使用隐藏标题栏，在所有平台上自定义标题栏
     titleBarStyle: isMac ? 'hiddenInset' : 'hidden', // macOS 保留交通灯，Windows/Linux 完全隐藏
-    trafficLightPosition: { x: 20, y: 20 }, // macOS 交通灯按钮位置
+    trafficLightPosition: { x: 20, y: 10 }, // 与自定义标题栏 h-8（32px）垂直居中
     vibrancy: 'sidebar', // macOS 毛玻璃效果（可选）
     transparent: true, // 透明窗口，用于四角圆角
     backgroundColor: '#00000000', // 透明背景

@@ -5,8 +5,41 @@
   },
   "nav": {
     "home": "首页",
+    "sketches": "闪记",
     "settings": "设置",
     "history": "历史"
+  },
+  "sketches": {
+    "start": "开始",
+    "end": "结束",
+    "idLabel": "闪记 ID",
+    "idCaption": "闪记",
+    "idPlaceholder": "按 ID 定位记录…",
+    "startedAtLabel": "开始时间",
+    "recordingStatus": "闪记进行中",
+    "elapsedLabel": "已进行",
+    "liveClockLabel": "当前时间",
+    "duringRecordingSidebar": "本次闪记尚未结束，暂无分段。点击「结束」后将固定本条并写入历史。",
+    "duringRecordingRight": "闪记进行中。点击「结束」后本条 ID 固定，可在此查看总结与详情。",
+    "recordTitle": "闪记 ID {{id}}",
+    "summaryAiButton": "总结",
+    "summaryPromptLabel": "总结提示词",
+    "summaryPromptDefault": "你是会议与语音记录整理专家。请根据本条闪记下全部录音的转写内容，整理成结构清晰、有条理的一份摘要：保留关键事实与决策，不要臆测或编造未在录音中出现的信息，可使用小标题与要点列表。",
+    "summaryQueuedToast": "已记录总结请求（AI 接口待接入）。",
+    "summaryNeedEndFirst": "请先结束当前闪记，再生成总结。",
+    "summaryNoSegments": "当前闪记下没有录音分段，无法总结。",
+    "recordingFile": "录音文件 {{n}}",
+    "tabSummary": "总结",
+    "tabDetails": "详情",
+    "noSegmentSelected": "在左侧选择一条录音片段，查看总结与详情。",
+    "summaryIntro": "针对当前选中片段的纪要、审计结论或 AI 概括将显示在这里。",
+    "detailsIntro": "转写文本、元数据与关键点标记将显示在这里。"
+  },
+  "layout": {
+    "collapseSidebar": "折叠侧边栏",
+    "expandSidebar": "展开侧边栏",
+    "collapseSidebarTooltip": "隐藏侧边栏（{{shortcut}}）",
+    "expandSidebarTooltip": "显示侧边栏（{{shortcut}}）"
   },
   "common": {
     "loading": "加载中...",
@@ -51,6 +84,7 @@
   },
   "settings": {
     "title": "设置",
+    "aboutTab": "关于",
     "about": "关于 Voice Key",
     "version": "当前版本：v{{version}}",
     "checkUpdate": "检查更新",
@@ -138,13 +172,17 @@
     }
   },
   "hotkey": {
-    "title": "快捷键设置",
+    "title": "快捷键",
     "description": "配置全局快捷键以控制录音和打开设置",
     "pttLabel": "录音快捷键（Push-to-Talk）",
     "preset": "预设",
     "custom": "自定义",
     "select": "选择快捷键",
     "pttHint": "长按录音，松开停止并发送",
+    "flashNoteStartLabel": "闪记开始快捷键",
+    "flashNoteStartHint": "按下此快捷键开始一条新的闪记",
+    "flashNoteEndLabel": "闪记结束快捷键",
+    "flashNoteEndHint": "按下此快捷键结束当前闪记",
     "settingsLabel": "打开设置窗口",
     "settingsHint": "按下此快捷键打开或关闭设置窗口",
     "reset": "重置默认",
