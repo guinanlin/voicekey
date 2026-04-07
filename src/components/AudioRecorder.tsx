@@ -4,36 +4,13 @@ import {
   AUDIO_CAPTURE_OPUS_BITRATE_MIN,
   DEFAULT_AUDIO_CAPTURE_PREFERENCES,
 } from '@electron/shared/constants'
-import type { AudioCapturePreferences } from '@electron/shared/types'
+import type { AudioCapturePreferences, SessionCaptureMode } from '@electron/shared/types'
 
 function clampOpusBitrate(bps: number): number {
   return Math.min(
     AUDIO_CAPTURE_OPUS_BITRATE_MAX,
     Math.max(AUDIO_CAPTURE_OPUS_BITRATE_MIN, Math.round(bps)),
   )
-}
-
-async function acquireMicStream(prefs: AudioCapturePreferences): Promise<MediaStream> {
-  const usePlainAudio = !prefs.preferMono && !prefs.echoCancellation && !prefs.noiseSuppression
-
-  if (usePlainAudio) {
-    return navigator.mediaDevices.getUserMedia({ audio: true })
-  }
-
-  const audio: MediaTrackConstraints = {
-    ...(prefs.preferMono ? { channelCount: { ideal: 1 } } : {}),
-    echoCancellation: prefs.echoCancellation,
-    noiseSuppression: prefs.noiseSuppression,
-  }
-
-  try {
-    return await navigator.mediaDevices.getUserMedia({ audio })
-  } catch (e) {
-    if (prefs.fallbackOnMicConstraintFailure) {
-      return navigator.mediaDevices.getUserMedia({ audio: true })
-    }
-    throw e
-  }
 }
 
 function createMediaRecorder(
@@ -53,194 +30,231 @@ function createMediaRecorder(
   }
 }
 
+function pickMimeType(): string {
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
+  for (const c of candidates) {
+    if (MediaRecorder.isTypeSupported(c)) return c
+  }
+  return ''
+}
+
+/**
+ * 按设置申请麦克风流。务必显式传 echo/noise/autoGain：仅用 `{ audio: true }` 时 Chromium 仍常默认开回声消除，
+ * 会把收音机/扬声器等环境声当回声削掉；与系统录音机行为不一致。
+ */
+async function acquireMicFromPrefs(ac: AudioCapturePreferences): Promise<MediaStream> {
+  const audio: MediaTrackConstraints = {
+    ...(ac.preferMono ? { channelCount: { ideal: 1 } } : {}),
+    /**
+     * 使用 ideal 软约束而非硬布尔值，避免设备/驱动不完全支持时直接失败。
+     * 这样更接近旧版本的稳定性（旧版接近 audio:true），同时尽量尊重设置偏好。
+     */
+    echoCancellation: { ideal: ac.echoCancellation },
+    noiseSuppression: { ideal: ac.noiseSuppression },
+    /** AGC 独立可配：在关闭回声/降噪时仍可开启以提升远场与外放可收录性 */
+    autoGainControl: { ideal: ac.autoGainControl },
+  }
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio })
+  } catch (e) {
+    if (ac.fallbackOnMicConstraintFailure) {
+      // eslint-disable-next-line no-console -- constraint fallback
+      console.warn(
+        '[Renderer] getUserMedia with explicit constraints failed, fallback audio:true',
+        e,
+      )
+      return navigator.mediaDevices.getUserMedia({ audio: true })
+    }
+    throw e
+  }
+}
+
+/**
+ * 无头录音：
+ * - **PTT / 闪记**（新开流时）：均走 `acquireMicFromPrefs`（`ideal` 软约束 + 可选回退），与设置页一致。
+ *   曾对 PTT 单独使用 `{ audio: true }` 以抬升成功率，但 Chromium 会对「宽松约束」套用默认回声/降噪/AGC，
+ *   与用户关闭上述项、依赖 AGC 等偏好冲突，表现为必须贴麦才能录清；故与闪记统一采集策略。
+ * - **闪记**分片间复用同一麦克风流（仅重建 `MediaRecorder`）。
+ */
 export function AudioRecorder() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
+  /** 最近一次 SESSION_START 的场景（闪记分片复用时沿用已打开的流，不依赖本值） */
+  const lastCaptureModeRef = useRef<SessionCaptureMode>('ptt')
   const chunksRef = useRef<Blob[]>([])
-  const analyserRef = useRef<AnalyserNode | null>(null)
-  const animationFrameRef = useRef<number | null>(null)
-  const isRecordingRef = useRef(false) // 录音状态守卫
+  const isRecordingRef = useRef(false)
 
-  // 统一的资源释放函数
-  const releaseResources = () => {
-    // 新增：防止重复调用
-    if (!isRecordingRef.current && !streamRef.current && !audioContextRef.current) {
-      return // 资源已释放，跳过
+  const audioConfigRef = useRef<AudioCapturePreferences>(DEFAULT_AUDIO_CAPTURE_PREFERENCES)
+  const mimeTypeRef = useRef('')
+
+  const streamReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const cancelStreamRelease = (): void => {
+    if (streamReleaseTimerRef.current) {
+      clearTimeout(streamReleaseTimerRef.current)
+      streamReleaseTimerRef.current = null
     }
-    // 立即标记为非录音状态，防止并发调用
+  }
+
+  const releaseResources = (): void => {
+    cancelStreamRelease()
     isRecordingRef.current = false
-    // 停止动画帧
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current)
-      animationFrameRef.current = null
-    }
-
-    // 关闭 AudioContext
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-      audioContextRef.current = null
-    }
-
-    // 释放麦克风流
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => {
-        // eslint-disable-next-line no-console -- debug resource release
-        console.log(`[Renderer] Releasing track: ${track.kind}, readyState: ${track.readyState}`)
-        track.stop()
-        // eslint-disable-next-line no-console -- debug resource release
-        console.log(`[Renderer] Track released, new readyState: ${track.readyState}`)
-      })
+      streamRef.current.getTracks().forEach((t) => t.stop())
       streamRef.current = null
     }
-
-    analyserRef.current = null
     mediaRecorderRef.current = null
-    chunksRef.current = [] // 新增：防止内存泄漏和数据污染
-    isRecordingRef.current = false
+    chunksRef.current = []
+    mimeTypeRef.current = ''
   }
+
+  const scheduleStreamRelease = (): void => {
+    cancelStreamRelease()
+    streamReleaseTimerRef.current = setTimeout(() => {
+      streamReleaseTimerRef.current = null
+      // eslint-disable-next-line no-console -- debug idle release
+      console.log('[Renderer] Stream idle timeout — releasing resources')
+      releaseResources()
+    }, 2000)
+  }
+
+  const isStreamAlive = (): boolean =>
+    !!streamRef.current && streamRef.current.getTracks().some((t) => t.readyState === 'live')
 
   useEffect(() => {
     const api = window.electronAPI
-    if (!api) {
-      // 非 Electron 环境（如纯浏览器访问 localhost）时 electronAPI 不存在，跳过注册
-      return
-    }
+    if (!api) return
 
-    api.onStartRecording(async () => {
-      // 录音状态守卫：防止重复录音
+    const unsubStart = api.onStartRecording(async (payload) => {
+      const mode: SessionCaptureMode = payload?.captureMode ?? 'ptt'
+      lastCaptureModeRef.current = mode
+
       if (isRecordingRef.current) {
-        // eslint-disable-next-line no-console -- debug duplicate start
+        // eslint-disable-next-line no-console -- guard
         console.warn('[Renderer] Already recording, ignoring start request')
         return
       }
 
       try {
-        // 确保之前的录音已清理
-        releaseResources()
-
+        cancelStreamRelease()
         isRecordingRef.current = true
 
-        const fullConfig = await api.getConfig()
-        const ac: AudioCapturePreferences = {
-          ...DEFAULT_AUDIO_CAPTURE_PREFERENCES,
-          ...(fullConfig.app.audioCapture ?? {}),
-        }
+        let inputStream: MediaStream
+        let reused = false
 
-        const stream = await acquireMicStream(ac)
-        streamRef.current = stream // 保存引用
-
-        const audioContext = new AudioContext()
-        audioContextRef.current = audioContext // 保存引用
-        if (audioContext.state === 'suspended') {
-          await audioContext.resume()
-        }
-
-        const source = audioContext.createMediaStreamSource(stream)
-        const analyser = audioContext.createAnalyser()
-        analyser.fftSize = 256
-        analyser.smoothingTimeConstant = 0.3
-        source.connect(analyser)
-        analyserRef.current = analyser
-
-        const dataArray = new Uint8Array(analyser.frequencyBinCount)
-
-        const sendAudioLevel = () => {
-          if (!analyserRef.current) return
-          analyserRef.current.getByteFrequencyData(dataArray)
-          const sum = dataArray.reduce((a, b) => a + b, 0)
-          const average = sum / dataArray.length
-          const normalized = Math.min(average / 128, 1)
-          api.sendAudioLevel(normalized)
-          animationFrameRef.current = requestAnimationFrame(sendAudioLevel)
-        }
-        sendAudioLevel()
-
-        const pickRecorderMimeType = (): string => {
-          const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
-          for (const c of candidates) {
-            if (MediaRecorder.isTypeSupported(c)) {
-              return c
-            }
+        if (isStreamAlive()) {
+          const s = streamRef.current
+          if (!s) {
+            isRecordingRef.current = false
+            return
           }
-          return ''
+          inputStream = s
+          reused = true
+          // eslint-disable-next-line no-console -- debug reuse
+          console.log('[Renderer] Reusing existing mic stream for next chunk')
+        } else {
+          releaseResources()
+          isRecordingRef.current = true
+
+          const fullConfig = await api.getConfig()
+          const ac: AudioCapturePreferences = {
+            ...DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+            ...(fullConfig.app.audioCapture ?? {}),
+          }
+          audioConfigRef.current = ac
+          mimeTypeRef.current = pickMimeType()
+
+          const base = await acquireMicFromPrefs(ac)
+          streamRef.current = base
+          inputStream = base
         }
 
-        const mimeType = pickRecorderMimeType()
-        const mediaRecorder = createMediaRecorder(stream, mimeType, ac.opusBitsPerSecond)
+        inputStream.getTracks().forEach((t) => {
+          // eslint-disable-next-line no-console -- diagnostic
+          console.log(
+            `[Renderer] Recorder track: kind=${t.kind} enabled=${t.enabled} muted=${t.muted} readyState=${t.readyState}`,
+          )
+        })
+
+        const mimeType = mimeTypeRef.current
+        const mediaRecorder = createMediaRecorder(
+          inputStream,
+          mimeType,
+          audioConfigRef.current.opusBitsPerSecond,
+        )
         mediaRecorderRef.current = mediaRecorder
         chunksRef.current = []
 
         mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) {
-            chunksRef.current.push(e.data)
-          }
+          if (e.data.size > 0) chunksRef.current.push(e.data)
         }
 
-        /** 周期性产出数据，避免仅依赖 stop 时一次 flush 导致 webm 过小、ASR 无有效音频 */
         const TIMESLICE_MS = 250
 
         mediaRecorder.onstop = async () => {
-          // 处理音频数据
-          const blob = new Blob(chunksRef.current, {
+          const chunks = chunksRef.current
+          const blob = new Blob(chunks, {
             type: mimeType || mediaRecorder.mimeType || 'audio/webm',
           })
           const buffer = await blob.arrayBuffer()
-          api.sendAudioData(buffer)
 
-          // 释放所有资源
-          releaseResources()
-          // eslint-disable-next-line no-console -- debug recording stop
-          console.log('[Renderer] Recording stopped, resources released')
+          mediaRecorderRef.current = null
+          chunksRef.current = []
+          isRecordingRef.current = false
+
+          api.sendAudioData(buffer)
+          // eslint-disable-next-line no-console -- diagnostic
+          console.log(
+            `[Renderer] Recording stopped — chunks: ${chunks.length}, buffer bytes: ${buffer.byteLength}`,
+          )
+
+          scheduleStreamRelease()
         }
 
         mediaRecorder.onerror = (e) => {
-          // eslint-disable-next-line no-console -- record recorder error
+          // eslint-disable-next-line no-console -- recorder error
           console.error('[Renderer] MediaRecorder error:', e)
           api.sendError(`MediaRecorder error: ${e}`)
-          // 错误时也释放资源
           releaseResources()
         }
 
-        // eslint-disable-next-line no-console -- debug recording start
-        console.log('[Renderer] Recording started')
+        // eslint-disable-next-line no-console -- debug
+        console.log(
+          `[Renderer] Recording started (reuse=${reused}, mode=${lastCaptureModeRef.current})`,
+        )
         mediaRecorder.start(TIMESLICE_MS)
       } catch (err) {
-        // eslint-disable-next-line no-console -- report mic access failure
+        // eslint-disable-next-line no-console -- mic failure
         console.error('[Renderer] Failed to start recording:', err)
         api.sendError(`Failed to access microphone: ${err}`)
-        // 启动失败也要释放
         releaseResources()
       }
     })
 
-    api.onStopRecording(() => {
-      // eslint-disable-next-line no-console -- debug stop trigger
+    const unsubStop = api.onStopRecording(() => {
+      // eslint-disable-next-line no-console -- debug
       console.log('[Renderer] onStopRecording triggered')
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         const mr = mediaRecorderRef.current
         try {
           mr.requestData()
         } catch {
-          // 部分环境不支持 requestData，忽略
+          // 部分环境不支持 requestData
         }
-        // 与 requestData 错开一帧，避免部分 Chromium 上 stop 过早导致 chunks 几乎为空
         setTimeout(() => {
-          if (mr.state === 'recording') {
-            mr.stop()
-          }
-        }, 0)
+          if (mr.state === 'recording') mr.stop()
+        }, 50)
       } else {
-        // 如果没有活跃的录音，也尝试释放资源（兜底）
         releaseResources()
       }
     })
 
-    // 组件卸载时清理
     return () => {
+      unsubStart()
+      unsubStop()
       releaseResources()
-      // eslint-disable-next-line no-console -- debug unmount cleanup
-      console.log('[Renderer] Component unmounted, resources released')
+      // eslint-disable-next-line no-console -- debug
+      console.log('[Renderer] AudioRecorder effect disposed')
     }
   }, [])
 

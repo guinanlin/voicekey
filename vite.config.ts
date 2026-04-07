@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => {
                   '@nut-tree-fork/nut-js',
                   'uiohook-napi',
                   'node-record-lpcm16',
+                  'better-sqlite3',
                   'fluent-ffmpeg',
                   '@ffmpeg-installer/ffmpeg',
                   'fastify',

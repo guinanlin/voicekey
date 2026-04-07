@@ -1,12 +1,14 @@
 import {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   Notification,
   Tray,
   Menu,
   nativeImage,
   screen,
+  shell,
 } from 'electron'
 import fs from 'fs'
 
@@ -25,7 +27,7 @@ import { fileURLToPath } from 'node:url'
 import { UiohookKey } from 'uiohook-napi'
 import { ASRProvider } from './asr-provider'
 import { configManager } from './config-manager'
-import { DASHSCOPE } from '../shared/constants'
+import { DASHSCOPE, FLASH_NOTE } from '../shared/constants'
 import {
   fileUrlFromErpnextUploadResponse,
   uploadErpnextcnDtyFile,
@@ -39,7 +41,15 @@ import { ioHookManager } from './iohook-manager'
 import { textInjector } from './text-injector'
 import { UpdaterManager } from './updater-manager'
 import { startHttpServer, stopHttpServer } from './http-server'
-import { ASRConfig, IPC_CHANNELS, OverlayState, VoiceSession } from '../shared/types'
+import {
+  ASRConfig,
+  FlashChunkStatus,
+  IPC_CHANNELS,
+  OverlayState,
+  RecorderLockOwner,
+  VoiceSession,
+} from '../shared/types'
+import { FlashNoteRepository } from './flash-note-repository'
 // ES Module compatibility - 延迟导入 fluent-ffmpeg 避免启动时的 __dirname 错误
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let ffmpeg: any
@@ -94,6 +104,47 @@ let tray: Tray | null = null
 // const audioRecorder = new AudioRecorder()
 let asrProvider: ASRProvider | null = null
 let currentSession: VoiceSession | null = null
+let recorderLockOwner: RecorderLockOwner = 'none'
+
+type CaptureContext =
+  | {
+      owner: 'ptt'
+      sessionId: string
+      startedAt: number
+      durationMs?: number
+    }
+  | {
+      owner: 'flash'
+      sessionId: string
+      chunkId: string
+      chunkIndex: number
+      startedAt: number
+      endedAt?: number
+    }
+
+interface FlashRuntimeState {
+  sessionId: string | null
+  startedAt: number
+  isEnding: boolean
+  chunkIndex: number
+  chunkTimer: NodeJS.Timeout | null
+  elapsedTimer: NodeJS.Timeout | null
+}
+
+const flashRuntime: FlashRuntimeState = {
+  sessionId: null,
+  startedAt: 0,
+  isEnding: false,
+  chunkIndex: 0,
+  chunkTimer: null,
+  elapsedTimer: null,
+}
+
+let activeCaptureContext: CaptureContext | null = null
+let stoppedCaptureContext: CaptureContext | null = null
+
+const flashDbPath = path.join(app.getPath('userData'), 'flash-note', 'flash-note.sqlite')
+const flashRepository = new FlashNoteRepository(flashDbPath)
 
 // 创建主窗口（隐藏的后台窗口）
 function createMainWindow() {
@@ -124,6 +175,9 @@ function createMainWindow() {
   // 监听页面加载完成
   backgroundWindow.webContents.on('did-finish-load', () => {
     console.log('[Main] backgroundWindow finished loading')
+    if (backgroundWindow && !backgroundWindow.isDestroyed()) {
+      backgroundWindow.webContents.setBackgroundThrottling(false)
+    }
   })
 
   // 监听页面加载失败
@@ -261,6 +315,185 @@ function updateOverlay(state: OverlayState) {
   }
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_UPDATE, state)
+  }
+}
+
+function clearFlashTimers(): void {
+  if (flashRuntime.chunkTimer) {
+    clearTimeout(flashRuntime.chunkTimer)
+    flashRuntime.chunkTimer = null
+  }
+  if (flashRuntime.elapsedTimer) {
+    clearInterval(flashRuntime.elapsedTimer)
+    flashRuntime.elapsedTimer = null
+  }
+}
+
+function isFlashActive(): boolean {
+  return !!flashRuntime.sessionId
+}
+
+function notifyFlashStateChanged(): void {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.webContents.send(IPC_CHANNELS.FLASH_STATE_CHANGED)
+  }
+}
+
+function startFlashOverlayTicker(sessionId: string): void {
+  if (!flashRuntime.startedAt) return
+  if (flashRuntime.elapsedTimer) clearInterval(flashRuntime.elapsedTimer)
+  flashRuntime.elapsedTimer = setInterval(() => {
+    const elapsedSeconds = Math.floor((Date.now() - flashRuntime.startedAt) / 1000)
+    updateOverlay({
+      status: 'recording',
+      mode: 'flash',
+      sessionId,
+      elapsedSeconds,
+    })
+  }, 1000)
+}
+
+function updateFlashChunkStatus(
+  chunkId: string,
+  status: FlashChunkStatus,
+  errorMessage?: string,
+): void {
+  flashRepository.updateChunk({
+    chunkId,
+    status,
+    errorMessage: errorMessage ?? null,
+  })
+  notifyFlashStateChanged()
+}
+
+/** 上一段 stop 与下一段 start 的间隔（ms），避免连得太紧导致渲染进程 WebM 无声音 */
+const FLASH_NEXT_CHUNK_DELAY_MS = 280
+
+function beginFlashChunkCapture(sessionId: string): void {
+  if (!flashRuntime.sessionId || flashRuntime.sessionId !== sessionId || flashRuntime.isEnding) {
+    return
+  }
+  if (!backgroundWindow || backgroundWindow.isDestroyed()) {
+    throw new Error('background window unavailable')
+  }
+  if (activeCaptureContext || recorderLockOwner === 'ptt') {
+    return
+  }
+  const chunkId = `flash-chunk-${Date.now()}`
+  const chunkIndex = flashRuntime.chunkIndex + 1
+  flashRuntime.chunkIndex = chunkIndex
+  activeCaptureContext = {
+    owner: 'flash',
+    sessionId,
+    chunkId,
+    chunkIndex,
+    startedAt: Date.now(),
+  }
+  recorderLockOwner = 'flash'
+
+  showOverlay({
+    status: 'recording',
+    mode: 'flash',
+    sessionId,
+    elapsedSeconds: Math.floor((Date.now() - flashRuntime.startedAt) / 1000),
+  })
+  startFlashOverlayTicker(sessionId)
+
+  backgroundWindow.webContents.send(IPC_CHANNELS.SESSION_START, {
+    captureMode: 'flash',
+  })
+  flashRuntime.chunkTimer = setTimeout(() => {
+    void stopActiveFlashChunk(false)
+  }, FLASH_NOTE.CHUNK_DURATION_SEC * 1000)
+}
+
+async function startFlashSession(startedAt?: number): Promise<{ sessionId: string }> {
+  if (isFlashActive()) {
+    return { sessionId: flashRuntime.sessionId as string }
+  }
+  if (recorderLockOwner === 'ptt') {
+    throw new Error('PTT 正在录音，请稍后再试')
+  }
+  const t0 = startedAt ?? Date.now()
+  const sessionId = `flash-${t0}`
+  flashRuntime.sessionId = sessionId
+  flashRuntime.startedAt = t0
+  flashRuntime.isEnding = false
+  flashRuntime.chunkIndex = 0
+  flashRepository.createSession(sessionId, new Date(t0).toISOString(), 'recording')
+  notifyFlashStateChanged()
+  beginFlashChunkCapture(sessionId)
+  return { sessionId }
+}
+
+async function stopActiveFlashChunk(endSession: boolean): Promise<void> {
+  const active = activeCaptureContext
+  if (!active || active.owner !== 'flash') {
+    if (endSession && flashRuntime.sessionId) {
+      await finalizeFlashSessionIfDone()
+    }
+    return
+  }
+
+  if (!backgroundWindow || backgroundWindow.isDestroyed()) {
+    throw new Error('background window unavailable')
+  }
+
+  clearFlashTimers()
+  flashRuntime.isEnding = endSession
+  const endedAt = Date.now()
+  const chunkRow = {
+    chunkId: active.chunkId,
+    sessionId: active.sessionId,
+    chunkIndex: active.chunkIndex,
+    startedAt: new Date(active.startedAt).toISOString(),
+    endedAt: new Date(endedAt).toISOString(),
+    audioPath: null as string | null,
+    remoteUrl: null as string | null,
+    status: 'pending' as FlashChunkStatus,
+  }
+  flashRepository.createChunk(chunkRow)
+  notifyFlashStateChanged()
+
+  stoppedCaptureContext = { ...active, endedAt }
+  activeCaptureContext = null
+  recorderLockOwner = 'none'
+  backgroundWindow.webContents.send(IPC_CHANNELS.SESSION_STOP)
+}
+
+async function finalizeFlashSessionIfDone(): Promise<void> {
+  const sessionId = flashRuntime.sessionId
+  if (!sessionId) return
+  if (!flashRuntime.isEnding) return
+  if (activeCaptureContext?.owner === 'flash') return
+
+  const activeSession = flashRepository.getActiveSession()
+  if (!activeSession || activeSession.sessionId !== sessionId) return
+  const hasPending = activeSession.chunks.some((c) =>
+    ['recording', 'pending', 'uploading', 'transcribing'].includes(c.status),
+  )
+  if (hasPending) return
+
+  flashRepository.updateSessionStatus(sessionId, 'completed', new Date().toISOString())
+  flashRuntime.sessionId = null
+  flashRuntime.startedAt = 0
+  flashRuntime.isEnding = false
+  flashRuntime.chunkIndex = 0
+  clearFlashTimers()
+  if (recorderLockOwner === 'flash') recorderLockOwner = 'none'
+  updateOverlay({ status: 'success', mode: 'flash', message: '闪记已完成' })
+  setTimeout(() => hideOverlay(), 1000)
+  notifyFlashStateChanged()
+}
+
+async function endFlashSession(): Promise<void> {
+  if (!flashRuntime.sessionId) return
+  flashRuntime.isEnding = true
+  flashRepository.updateSessionStatus(flashRuntime.sessionId, 'flushing')
+  notifyFlashStateChanged()
+  await stopActiveFlashChunk(true)
+  if (!activeCaptureContext) {
+    await finalizeFlashSessionIfDone()
   }
 }
 
@@ -505,6 +738,7 @@ function registerGlobalHotkeys() {
     const DEBOUNCE_MS = 50 // 50ms 确认期
 
     const checkPTT = () => {
+      if (isFlashActive()) return
       // 判断是否按住设置的快捷键（精确匹配）
       const isPressed = ioHookManager.isPressed(pttConfig.modifiers, pttConfig.key)
 
@@ -544,6 +778,20 @@ function registerGlobalHotkeys() {
   hotkeyManager.register(hotkeyConfig.toggleSettings, () => {
     createSettingsWindow()
   })
+
+  hotkeyManager.register(hotkeyConfig.flashNoteStart, () => {
+    void startFlashSession().catch((error) => {
+      console.error('[Main] Failed to start flash session:', error)
+      showErrorAndHide(error instanceof Error ? error.message : t('errors.startFailed'))
+    })
+  })
+
+  hotkeyManager.register(hotkeyConfig.flashNoteEnd, () => {
+    void endFlashSession().catch((error) => {
+      console.error('[Main] Failed to end flash session:', error)
+      showErrorAndHide(error instanceof Error ? error.message : t('errors.stopFailed'))
+    })
+  })
 }
 
 // 处理开始录音
@@ -551,7 +799,13 @@ function registerGlobalHotkeys() {
 async function handleStartRecording() {
   const startTimestamp = Date.now()
   console.log(`[Main] [${new Date().toISOString()}] handleStartRecording triggered`)
+  if (isFlashActive() || recorderLockOwner === 'flash') {
+    return
+  }
   if (currentSession && currentSession.status === 'recording') {
+    return
+  }
+  if (activeCaptureContext) {
     return
   }
 
@@ -564,8 +818,14 @@ async function handleStartRecording() {
     }
 
     if (backgroundWindow && !backgroundWindow.isDestroyed()) {
+      activeCaptureContext = {
+        owner: 'ptt',
+        sessionId: currentSession.id,
+        startedAt: startTimestamp,
+      }
+      recorderLockOwner = 'ptt'
       console.log(`[Main] [${new Date().toISOString()}] Sending SESSION_START to backgroundWindow`)
-      backgroundWindow.webContents.send(IPC_CHANNELS.SESSION_START)
+      backgroundWindow.webContents.send(IPC_CHANNELS.SESSION_START, { captureMode: 'ptt' })
       const duration = Date.now() - startTimestamp
       console.log(`[Main] ⏱️  Recording start completed in ${duration}ms`)
     } else {
@@ -599,15 +859,26 @@ async function handleStopRecording() {
     updateOverlay({ status: 'processing' })
 
     if (backgroundWindow && !backgroundWindow.isDestroyed()) {
+      if (activeCaptureContext?.owner === 'ptt') {
+        stoppedCaptureContext = {
+          ...activeCaptureContext,
+          durationMs: recordingDuration,
+        }
+        activeCaptureContext = null
+      }
       console.log(`[Main] [${new Date().toISOString()}] Sending SESSION_STOP to backgroundWindow`)
       backgroundWindow.webContents.send(IPC_CHANNELS.SESSION_STOP)
     } else {
       console.error('[Main] Cannot send SESSION_STOP: backgroundWindow not available')
       showErrorAndHide(t('errors.stopFailed'))
+      stoppedCaptureContext = null
+      if (recorderLockOwner === 'ptt') recorderLockOwner = 'none'
     }
   } catch (error) {
     console.error('[Main] Failed to stop recording:', error)
     showErrorAndHide(t('errors.stopFailed'))
+    stoppedCaptureContext = null
+    if (recorderLockOwner === 'ptt') recorderLockOwner = 'none'
   }
 }
 
@@ -641,7 +912,7 @@ function convertToMP3(inputPath: string, outputPath: string): Promise<void> {
 }
 
 // 处理音频数据（来自渲染进程）
-async function handleAudioData(buffer: Buffer) {
+async function handlePTTAudioData(buffer: Buffer) {
   if (!currentSession) {
     console.log('[Main] Received audio data but no active session')
     return
@@ -810,6 +1081,8 @@ async function handleAudioData(buffer: Buffer) {
     console.log(`[Main] ⏱️  ========================================`)
 
     currentSession = null
+    stoppedCaptureContext = null
+    if (recorderLockOwner === 'ptt') recorderLockOwner = 'none'
   } catch (error) {
     const errorDuration = Date.now() - overallStartTime
     console.error(`[Main] Failed to process audio after ${errorDuration}ms:`, error)
@@ -821,6 +1094,8 @@ async function handleAudioData(buffer: Buffer) {
     if (currentSession) {
       currentSession.status = 'error'
     }
+    stoppedCaptureContext = null
+    if (recorderLockOwner === 'ptt') recorderLockOwner = 'none'
     try {
       if (fs.existsSync(tempWebmPath)) fs.unlinkSync(tempWebmPath)
       if (fs.existsSync(tempMp3Path)) fs.unlinkSync(tempMp3Path)
@@ -828,6 +1103,137 @@ async function handleAudioData(buffer: Buffer) {
       console.error('[Main] Failed to cleanup temp files:', cleanupError)
     }
   }
+}
+
+async function processFlashChunkAudio(
+  buffer: Buffer,
+  context: Extract<CaptureContext, { owner: 'flash' }>,
+): Promise<void> {
+  const flashAudioDir = path.join(app.getPath('userData'), 'flash-note', 'audio', context.sessionId)
+  if (!fs.existsSync(flashAudioDir)) {
+    fs.mkdirSync(flashAudioDir, { recursive: true })
+  }
+  const audioPath = path.join(flashAudioDir, `${context.chunkId}.webm`)
+  const asrCfg = configManager.getASRConfig()
+  const erpResolved = configManager.getErpnextcnDtyResolvedForUpload()
+
+  try {
+    fs.writeFileSync(audioPath, buffer)
+    updateFlashChunkStatus(context.chunkId, 'uploading')
+    flashRepository.updateChunk({ chunkId: context.chunkId, status: 'uploading', audioPath })
+
+    if (erpResolved.apiKey.trim().length === 0) {
+      throw new Error(t('errors.qwenNeedsErpnextUpload'))
+    }
+    if (!asrCfg.qwenApiKey?.trim()) {
+      throw new Error(t('settings.result.qwenApiKeyRequired'))
+    }
+
+    const uploadData = await uploadErpnextcnDtyFile(audioPath, erpResolved, {
+      contentType: 'audio/webm',
+    })
+    if (uploadData === null) {
+      throw new Error(t('errors.qwenNeedsErpnextUpload'))
+    }
+    const remoteUrl = fileUrlFromErpnextUploadResponse(uploadData)
+    if (!remoteUrl) {
+      throw new Error(t('errors.qwenFileUrlMissing'))
+    }
+    flashRepository.updateChunk({ chunkId: context.chunkId, status: 'transcribing', remoteUrl })
+    updateFlashChunkStatus(context.chunkId, 'transcribing')
+
+    const asrStartTime = Date.now()
+    const transcription = await transcribeQwenFromFileUrl(
+      {
+        ...asrCfg,
+        provider: 'qwen',
+      },
+      remoteUrl,
+    )
+    const asrDuration = Date.now() - asrStartTime
+    const textRaw = transcription.text
+    console.log(`[Main] [${new Date().toISOString()}] Flash chunk transcription received`, {
+      sessionId: context.sessionId,
+      chunkId: context.chunkId,
+    })
+    console.log(`[Main] ⏱️  Flash ASR transcription took ${asrDuration}ms`)
+    console.log(
+      '[Main] Flash transcription received (bytes):',
+      Buffer.from(textRaw).toString('hex'),
+    )
+    console.log('[Main] Flash transcription text:', textRaw)
+
+    flashRepository.updateChunk({
+      chunkId: context.chunkId,
+      status: 'success',
+      transcript: textRaw.trim(),
+      remoteUrl,
+      audioPath,
+      errorMessage: null,
+    })
+    notifyFlashStateChanged()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : t('errors.generic')
+    flashRepository.updateChunk({
+      chunkId: context.chunkId,
+      status: 'failed',
+      audioPath,
+      errorMessage: message,
+    })
+    notifyFlashStateChanged()
+    console.error('[Main] processFlashChunkAudio failed:', error)
+  } finally {
+    if (flashRuntime.isEnding) {
+      await finalizeFlashSessionIfDone()
+    }
+  }
+}
+
+async function handleRecordedAudioData(buffer: Buffer): Promise<void> {
+  const stopped = stoppedCaptureContext
+  if (!stopped) {
+    console.warn('[Main] Received audio data but no stopped capture context')
+    return
+  }
+
+  if (stopped.owner === 'ptt') {
+    await handlePTTAudioData(buffer)
+    return
+  }
+
+  stoppedCaptureContext = null
+  const shouldContinueRecording =
+    !flashRuntime.isEnding &&
+    flashRuntime.sessionId === stopped.sessionId &&
+    activeCaptureContext === null
+
+  if (shouldContinueRecording) {
+    try {
+      const sid = stopped.sessionId
+      console.log('[Main] Scheduling next flash chunk capture:', {
+        sessionId: sid,
+        previousChunkId: stopped.chunkId,
+        delayMs: FLASH_NEXT_CHUNK_DELAY_MS,
+      })
+      setTimeout(() => {
+        try {
+          beginFlashChunkCapture(sid)
+        } catch (error) {
+          console.error('[Main] Failed to continue flash recording after chunk stop:', error)
+        }
+      }, FLASH_NEXT_CHUNK_DELAY_MS)
+    } catch (error) {
+      console.error('[Main] Failed to schedule flash chunk continuation:', error)
+    }
+  } else {
+    updateOverlay({
+      status: 'processing',
+      mode: 'flash',
+      sessionId: stopped.sessionId,
+    })
+  }
+
+  await processFlashChunkAudio(buffer, stopped)
 }
 
 // 显示系统通知
@@ -902,6 +1308,56 @@ function setupIPCHandlers() {
     return currentSession?.status || 'idle'
   })
 
+  // 闪记相关
+  ipcMain.handle(IPC_CHANNELS.FLASH_GET_SESSIONS, () => {
+    return flashRepository.getSessionsWithChunks(200)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.FLASH_GET_ACTIVE_SESSION, () => {
+    return flashRepository.getActiveSession()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.FLASH_START, async () => {
+    return await startFlashSession()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.FLASH_END, async () => {
+    await endFlashSession()
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.FLASH_UPDATE_SUMMARY,
+    (_event, sessionId: string, summary: string) => {
+      flashRepository.updateSessionSummary(sessionId, summary)
+      notifyFlashStateChanged()
+    },
+  )
+
+  ipcMain.handle(IPC_CHANNELS.FLASH_DOWNLOAD_CHUNK, async (_event, chunkId: string) => {
+    const chunk = flashRepository.getChunk(chunkId)
+    if (!chunk?.audioPath || !fs.existsSync(chunk.audioPath)) {
+      return { savedPath: null }
+    }
+    const defaultFileName = path.basename(chunk.audioPath)
+    const result = await dialog.showSaveDialog({
+      defaultPath: path.join(app.getPath('downloads'), defaultFileName),
+      filters: [{ name: 'Audio', extensions: ['webm', 'opus', 'ogg'] }],
+    })
+    if (result.canceled || !result.filePath) {
+      return { savedPath: null }
+    }
+    fs.copyFileSync(chunk.audioPath, result.filePath)
+    return { savedPath: result.filePath }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.FLASH_PLAY_CHUNK, async (_event, chunkId: string) => {
+    const chunk = flashRepository.getChunk(chunkId)
+    if (!chunk?.audioPath || !fs.existsSync(chunk.audioPath)) {
+      return
+    }
+    await shell.openPath(chunk.audioPath)
+  })
+
   // 历史记录相关
   ipcMain.handle(IPC_CHANNELS.HISTORY_GET, () => historyManager.getAll())
   ipcMain.handle(IPC_CHANNELS.HISTORY_CLEAR, () => historyManager.clear())
@@ -909,7 +1365,7 @@ function setupIPCHandlers() {
 
   // 接收音频数据
   ipcMain.on(IPC_CHANNELS.AUDIO_DATA, (_event, buffer) => {
-    handleAudioData(Buffer.from(buffer))
+    void handleRecordedAudioData(Buffer.from(buffer))
   })
 
   ipcMain.on(IPC_CHANNELS.OVERLAY_AUDIO_LEVEL, (_event, level: number) => {
@@ -1025,6 +1481,20 @@ function setupIPCHandlers() {
   })
 }
 
+function recoverFlashSessionIfNeeded(): void {
+  const active = flashRepository.getActiveSession()
+  if (!active) return
+
+  console.log('[Main] Recovering flash session:', active.sessionId)
+  flashRuntime.sessionId = active.sessionId
+  flashRuntime.startedAt = new Date(active.startedAt).getTime()
+  flashRuntime.isEnding = false
+  flashRuntime.chunkIndex = active.chunks.length
+  flashRepository.updateSessionStatus(active.sessionId, 'recording')
+  notifyFlashStateChanged()
+  beginFlashChunkCapture(active.sessionId)
+}
+
 // 应用程序生命周期
 app.whenReady().then(async () => {
   if (process.platform !== 'darwin') {
@@ -1046,6 +1516,7 @@ app.whenReady().then(async () => {
   void UpdaterManager.checkForUpdates()
   registerGlobalHotkeys()
   ioHookManager.start()
+  recoverFlashSessionIfNeeded()
 
   // 启动 HTTP 服务器（监听 0.0.0.0，允许局域网访问）
   try {
@@ -1083,8 +1554,10 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', async () => {
   // 清理资源
+  clearFlashTimers()
   hotkeyManager.unregisterAll()
   ioHookManager.stop()
+  flashRepository.close()
   await stopHttpServer()
 })
 

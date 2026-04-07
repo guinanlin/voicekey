@@ -6,6 +6,8 @@ import {
   AppConfig,
   ASRConfig,
   UpdateInfo,
+  FlashSessionWithChunks,
+  SessionStartPayload,
 } from '../shared/types'
 
 // 定义暴露给渲染进程的API接口
@@ -34,6 +36,16 @@ export interface ElectronAPI {
   deleteHistoryItem: (id: string) => Promise<void>
   onHistoryChanged: (callback: () => void) => () => void
 
+  // 闪记相关
+  getFlashSessions: () => Promise<FlashSessionWithChunks[]>
+  getActiveFlashSession: () => Promise<FlashSessionWithChunks | null>
+  startFlashSession: () => Promise<{ sessionId: string }>
+  endFlashSession: () => Promise<void>
+  updateFlashSummary: (sessionId: string, summary: string) => Promise<void>
+  downloadFlashChunk: (chunkId: string) => Promise<{ savedPath: string | null }>
+  playFlashChunk: (chunkId: string) => Promise<void>
+  onFlashStateChanged: (callback: () => void) => () => void
+
   // 快捷键相关
   registerHotkey: (accelerator: string) => Promise<boolean>
   unregisterHotkey: (accelerator: string) => Promise<void>
@@ -43,7 +55,7 @@ export interface ElectronAPI {
   onTranscription: (callback: (text: string) => void) => () => void
   onError: (callback: (error: string) => void) => () => void
 
-  onStartRecording: (callback: () => void) => () => void
+  onStartRecording: (callback: (payload?: SessionStartPayload) => void) => () => void
   onStopRecording: (callback: () => void) => () => void
   sendAudioData: (buffer: ArrayBuffer) => void
   sendError: (error: string) => void
@@ -104,6 +116,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener(IPC_CHANNELS.HISTORY_CHANGED, listener)
   },
 
+  // 闪记相关
+  getFlashSessions: () => ipcRenderer.invoke(IPC_CHANNELS.FLASH_GET_SESSIONS),
+  getActiveFlashSession: () => ipcRenderer.invoke(IPC_CHANNELS.FLASH_GET_ACTIVE_SESSION),
+  startFlashSession: () => ipcRenderer.invoke(IPC_CHANNELS.FLASH_START),
+  endFlashSession: () => ipcRenderer.invoke(IPC_CHANNELS.FLASH_END),
+  updateFlashSummary: (sessionId: string, summary: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FLASH_UPDATE_SUMMARY, sessionId, summary),
+  downloadFlashChunk: (chunkId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FLASH_DOWNLOAD_CHUNK, chunkId),
+  playFlashChunk: (chunkId: string) => ipcRenderer.invoke(IPC_CHANNELS.FLASH_PLAY_CHUNK, chunkId),
+  onFlashStateChanged: (callback: () => void) => {
+    const listener = () => callback()
+    ipcRenderer.on(IPC_CHANNELS.FLASH_STATE_CHANGED, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.FLASH_STATE_CHANGED, listener)
+  },
+
   // 快捷键相关
   registerHotkey: (accelerator: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.HOTKEY_REGISTER, accelerator),
@@ -128,10 +156,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // [NEW] Audio Recording (Main -> Renderer)
-  onStartRecording: (callback: () => void) => {
-    const listener = () => {
-      console.log('[Preload] Received SESSION_START')
-      callback()
+  onStartRecording: (callback: (payload?: SessionStartPayload) => void) => {
+    const listener = (_event: IpcRendererEvent, payload?: SessionStartPayload) => {
+      console.log('[Preload] Received SESSION_START', payload)
+      callback(payload)
     }
     ipcRenderer.on(IPC_CHANNELS.SESSION_START, listener)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.SESSION_START, listener)

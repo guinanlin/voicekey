@@ -6,6 +6,8 @@ import type { OverlayState, OverlayStatus } from '../../electron/shared/types'
 export function HUD() {
   const { t } = useTranslation()
   const [status, setStatus] = useState<OverlayStatus>('recording')
+  const [mode, setMode] = useState<'ptt' | 'flash'>('ptt')
+  const [sessionId, setSessionId] = useState<string>('')
   const [message, setMessage] = useState<string>('')
   const [noTextInjected, setNoTextInjected] = useState(false)
   const [audioLevel, setAudioLevel] = useState(0)
@@ -17,6 +19,7 @@ export function HUD() {
 
   // 录音时长（秒数）
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [elapsedSecondsFromMain, setElapsedSecondsFromMain] = useState<number | null>(null)
   const recordingStartTimeRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -31,8 +34,11 @@ export function HUD() {
 
     const removeOverlayUpdateListener = api.onOverlayUpdate((state: OverlayState) => {
       setStatus(state.status)
+      setMode(state.mode ?? 'ptt')
+      setSessionId(state.sessionId ?? '')
       setMessage(state.message ?? '')
       setNoTextInjected(state.noTextInjected ?? false)
+      setElapsedSecondsFromMain(state.elapsedSeconds ?? null)
     })
 
     const removeAudioLevelListener = api.onAudioLevel((level: number) => {
@@ -66,7 +72,7 @@ export function HUD() {
 
   // 录音时长计时器
   useEffect(() => {
-    if (status === 'recording') {
+    if (status === 'recording' && elapsedSecondsFromMain === null) {
       // 记录开始时间
       recordingStartTimeRef.current = Date.now()
       // 延迟重置秒数，避免在 effect 中直接调用 setState
@@ -95,7 +101,9 @@ export function HUD() {
       }, 0)
       return () => clearTimeout(resetTimer)
     }
-  }, [status])
+  }, [status, elapsedSecondsFromMain])
+
+  const displayElapsedSeconds = elapsedSecondsFromMain ?? elapsedSeconds
 
   const handleCancel = () => {
     if (status === 'recording') {
@@ -173,9 +181,14 @@ export function HUD() {
               {/* Recording Duration - 秒数显示 */}
               <div className="flex items-center border-l border-white/10 pl-1">
                 <span className="text-xs font-mono font-medium text-white/90 tabular-nums">
-                  {String(elapsedSeconds).padStart(3, '0')}
+                  {String(displayElapsedSeconds).padStart(3, '0')}
                 </span>
               </div>
+              {mode === 'flash' && (
+                <div className="text-[10px] text-white/70 border-l border-white/10 pl-1.5 truncate max-w-[100px]">
+                  闪记{sessionId ? ` ${sessionId}` : ''}
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex items-center gap-0.5 border-l border-white/10 pl-1.5">

@@ -634,6 +634,58 @@ export default function SettingsPage() {
 
                 <div className="flex items-center justify-between space-x-2">
                   <div className="space-y-0.5">
+                    <Label htmlFor="autoGainControl">
+                      {t('settings.audioCaptureAutoGainControl')}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.audioCaptureAutoGainControlHelp')}
+                    </p>
+                  </div>
+                  <Switch
+                    id="autoGainControl"
+                    checked={
+                      config.app.audioCapture?.autoGainControl ??
+                      DEFAULT_AUDIO_CAPTURE_PREFERENCES.autoGainControl
+                    }
+                    onCheckedChange={(checked) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        app: {
+                          ...prev.app,
+                          audioCapture: {
+                            ...DEFAULT_AUDIO_CAPTURE_PREFERENCES,
+                            ...prev.app.audioCapture,
+                            autoGainControl: checked,
+                          },
+                        },
+                      }))
+                    }
+                    className="no-drag cursor-pointer"
+                  />
+                </div>
+
+                {(() => {
+                  const echo =
+                    config.app.audioCapture?.echoCancellation ??
+                    DEFAULT_AUDIO_CAPTURE_PREFERENCES.echoCancellation
+                  const noise =
+                    config.app.audioCapture?.noiseSuppression ??
+                    DEFAULT_AUDIO_CAPTURE_PREFERENCES.noiseSuppression
+                  if (!echo && noise) {
+                    return (
+                      <Alert className="border-amber-500/40 bg-amber-500/5">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription>
+                          {t('settings.audioCaptureRadioNoiseMismatch')}
+                        </AlertDescription>
+                      </Alert>
+                    )
+                  }
+                  return null
+                })()}
+
+                <div className="flex items-center justify-between space-x-2">
+                  <div className="space-y-0.5">
                     <Label htmlFor="micFallback">{t('settings.audioCaptureMicFallback')}</Label>
                     <p className="text-sm text-muted-foreground">
                       {t('settings.audioCaptureMicFallbackHelp')}

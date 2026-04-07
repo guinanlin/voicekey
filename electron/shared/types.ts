@@ -42,6 +42,53 @@ export interface HotkeyConfig {
   toggleSettings: string
 }
 
+export type RecorderLockOwner = 'none' | 'ptt' | 'flash'
+
+export type FlashSessionStatus = 'recording' | 'flushing' | 'completed' | 'failed'
+export type FlashChunkStatus =
+  | 'recording'
+  | 'pending'
+  | 'uploading'
+  | 'transcribing'
+  | 'success'
+  | 'failed'
+
+export interface FlashSession {
+  sessionId: string
+  startedAt: string
+  endedAt: string | null
+  status: FlashSessionStatus
+  summary: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface FlashChunk {
+  chunkId: string
+  sessionId: string
+  chunkIndex: number
+  startedAt: string
+  endedAt: string
+  audioPath: string | null
+  remoteUrl: string | null
+  status: FlashChunkStatus
+  transcript: string | null
+  errorMessage: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface FlashSessionWithChunks extends FlashSession {
+  chunks: FlashChunk[]
+}
+
+/** 主进程通过 SESSION_START 告知后台录音窗口当前采集场景 */
+export type SessionCaptureMode = 'ptt' | 'flash'
+
+export interface SessionStartPayload {
+  captureMode: SessionCaptureMode
+}
+
 /** 应用内麦克风采集与 MediaRecorder 参数（设置页「应用偏好」可配） */
 export interface AudioCapturePreferences {
   /** WebM/Opus 目标码率（bps），过小可能影响识别 */
@@ -50,6 +97,8 @@ export interface AudioCapturePreferences {
   preferMono: boolean
   echoCancellation: boolean
   noiseSuppression: boolean
+  /** 自动增益控制（AGC）：提升远场/外放可收录性；过强时人声可能更“顶” */
+  autoGainControl: boolean
   /** 约束失败时回退为 `{ audio: true }` */
   fallbackOnMicConstraintFailure: boolean
 }
@@ -136,6 +185,16 @@ export const IPC_CHANNELS = {
   HISTORY_DELETE: 'history:delete',
   HISTORY_CHANGED: 'history:changed',
 
+  // 闪记相关
+  FLASH_GET_SESSIONS: 'flash:get-sessions',
+  FLASH_GET_ACTIVE_SESSION: 'flash:get-active-session',
+  FLASH_START: 'flash:start',
+  FLASH_END: 'flash:end',
+  FLASH_UPDATE_SUMMARY: 'flash:update-summary',
+  FLASH_DOWNLOAD_CHUNK: 'flash:download-chunk',
+  FLASH_PLAY_CHUNK: 'flash:play-chunk',
+  FLASH_STATE_CHANGED: 'flash:state-changed',
+
   // 更新相关
   CHECK_FOR_UPDATES: 'update:check',
   GET_UPDATE_STATUS: 'update:get-status',
@@ -155,9 +214,14 @@ export const IPC_CHANNELS = {
 
 export type OverlayStatus = 'recording' | 'processing' | 'success' | 'error'
 
+export type OverlayMode = 'ptt' | 'flash'
+
 export interface OverlayState {
   status: OverlayStatus
+  mode?: OverlayMode
   message?: string
+  elapsedSeconds?: number
+  sessionId?: string
   /** 成功结束但无可插入文本（如 ASR 返回空），HUD 不显示「已注入」 */
   noTextInjected?: boolean
 }

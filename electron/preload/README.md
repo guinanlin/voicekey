@@ -24,7 +24,7 @@ IPC 通信桥接脚本，运行在渲染进程上下文但可访问部分 Node.j
 
 **录音会话**
 
-- `onStartRecording(callback)` - 监听录音开始信号（主进程 → 渲染）
+- `onStartRecording(callback)` - 监听录音开始信号（主进程 → 渲染）；回调接收可选 `SessionStartPayload`（`captureMode: 'ptt' | 'flash'`），供渲染进程区分一键转写与闪记采集策略
 - `onStopRecording(callback)` - 监听录音停止信号（主进程 → 渲染）
 - `sendAudioData(buffer)` - 发送录制的音频数据（渲染 → 主进程）
 - `sendError(error)` - 发送错误信息
@@ -38,6 +38,14 @@ IPC 通信桥接脚本，运行在渲染进程上下文但可访问部分 Node.j
 
 - `getHistory()` / `clearHistory()` / `deleteHistoryItem(id)` - 读取、清空、删除
 - `onHistoryChanged(callback)` - 主进程追加历史后通知（如 HTTP `/clipboard/type` 成功）
+
+**闪记**
+
+- `getFlashSessions()` / `getActiveFlashSession()` - 读取闪记历史会话与当前进行中会话（含分片）
+- `startFlashSession()` / `endFlashSession()` - 开始或结束闪记会话
+- `updateFlashSummary(sessionId, summary)` - 更新会话总结文本
+- `downloadFlashChunk(chunkId)` / `playFlashChunk(chunkId)` - 下载分片音频或调用系统播放器打开
+- `onFlashStateChanged(callback)` - 会话或分片状态变化通知
 
 **事件监听**
 

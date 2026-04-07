@@ -32,12 +32,13 @@ export const AUDIO_CONFIG = {
   BIT_DEPTH: 16,
 } as const
 
-/** 设置页与主进程合并用的默认采集策略（推荐：单声道 + 24kbps + 处理链 + 失败回退） */
+/** 默认采集：与设置页出厂一致——单声道 + 24kbps；回声/降噪/AGC 均默认关；约束失败时回退开启 */
 export const DEFAULT_AUDIO_CAPTURE_PREFERENCES: AudioCapturePreferences = {
   opusBitsPerSecond: 24_000,
   preferMono: true,
-  echoCancellation: true,
-  noiseSuppression: true,
+  echoCancellation: false,
+  noiseSuppression: false,
+  autoGainControl: false,
   fallbackOnMicConstraintFailure: true,
 }
 
@@ -46,6 +47,12 @@ export const AUDIO_CAPTURE_OPUS_BITRATE_OPTIONS = [16000, 24000, 32000, 48000, 6
 
 export const AUDIO_CAPTURE_OPUS_BITRATE_MIN = 6000
 export const AUDIO_CAPTURE_OPUS_BITRATE_MAX = 128000
+
+/** 闪记分片策略：固定 4 分钟，单片硬上限 5 分钟 */
+export const FLASH_NOTE = {
+  CHUNK_DURATION_SEC: 240,
+  CHUNK_MAX_DURATION_SEC: 300,
+} as const
 
 /** ERPNextCN DTY 音频归档上传（与 ASR 并行，失败不影响主流程） */
 export const ERPNEXTCN_DTY = {

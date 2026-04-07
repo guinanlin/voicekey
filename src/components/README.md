@@ -14,9 +14,9 @@ shadcn/ui 组件库，基于 Radix UI 构建的可复用 UI 组件集合。包�
 
 无头音频录制组件，负责：
 
-- 监听主进程的录音信号
-- 管理音频流生命周期（防止麦克风占用和内存泄漏）
-- 优先 `audio/webm;codecs=opus`；每次开始录音前 `getConfig()` 读取 `app.audioCapture`（码率、单声道、回声消除、降噪、约束失败回退），与设置页「应用偏好」一致；`MediaRecorder` 使用所选 `audioBitsPerSecond`（clamp 6k–128k），不支持时回退默认；`AudioContext` 在 `suspended` 时 `resume()`；`MediaRecorder.start(250ms)` 分片；`requestData()` 后 `setTimeout(0)` 再 `stop()`，减轻 Chromium 上 chunks 过小问题
+- 监听主进程 `SESSION_START` / `SESSION_STOP` 信号启停录音
+- **闪记分片间复用同一条麦克风流**（仅重建 `MediaRecorder`），PTT 结束约 2 秒无新 `SESSION_START` 则 `stop` 轨并释放
+- 采集：主进程 `SESSION_START` 带 `captureMode`（用于日志/区分场景）；**PTT 与闪记** 新开流时均按 `app.audioCapture` 走 `acquireMicFromPrefs`（`ideal` 软约束、失败可回退 `audio:true`），避免 PTT 单独 `{ audio:true }` 触发浏览器默认处理与设置页不一致；仅 `MediaRecorder`；码率由 `getConfig()`；优先 `audio/webm;codecs=opus`；`start(250ms)` 分片；`requestData()` + `setTimeout(50)` 再 `stop()`
 - 录制并发送音频数据回主进程
 - 不渲染任何 UI（返回 `null`）
 
@@ -25,6 +25,7 @@ shadcn/ui 组件库，基于 Radix UI 构建的可复用 UI 组件集合。包�
 极简风格的录音状态浮窗组件（深色模式）：
 
 - 显示录音状态和实时波形动画
+- 支持 PTT / 闪记两种模式：闪记态展示会话标识与主进程上报时长
 - 提供取消/完成操作按钮
 - 展示处理中、成功或错误状态反馈；`noTextInjected` 时成功态不显示「已注入」
 - 自适应状态球和紧凑布局
