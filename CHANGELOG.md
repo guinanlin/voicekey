@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.32](https://github.com/guinanlin/voicekey/compare/v0.2.31...v0.2.32) (2026-04-07)
+
+### Features
+
+- **flash-note:** add sketches workspace and flash note hotkeys ([a29b06e](https://github.com/guinanlin/voicekey/commit/a29b06ee385dd008c320f1b33aaa393bfd7bfcda))
+- **flash-note:** add SQLite-backed sessions and flash note UI ([5276678](https://github.com/guinanlin/voicekey/commit/5276678763278668ad46775be6cd3f134bd40fae))
+
 ### [0.2.31](https://github.com/guinanlin/voicekey/compare/v0.2.30...v0.2.31) (2026-04-05)
 
 ### Features
