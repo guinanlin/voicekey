@@ -60,7 +60,7 @@ export default function HomePage() {
   }, [])
 
   return (
-    <div className="flex min-h-full max-w-4xl flex-col gap-3 pb-1">
+    <div className="flex min-h-full max-w-4xl flex-col gap-3 pb-1 pt-6">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-bold text-foreground">{t('home.title')}</h1>
         {loading ? <Badge variant="outline">{t('common.loadingHistory')}</Badge> : null}

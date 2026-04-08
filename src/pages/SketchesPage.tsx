@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getLocale } from '@electron/shared/i18n'
-import { Download, Play } from 'lucide-react'
+import { Download, Play, ScrollText, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -184,13 +191,29 @@ export default function SketchesPage() {
     }
   }, [])
 
+  const onSessionSummarize = useCallback(() => {
+    if (activeSession) {
+      toast.message(t('sketches.summaryNeedEndFirst'))
+      return
+    }
+    if (!selectedSession) {
+      toast.message(t('sketches.summaryNoSession'))
+      return
+    }
+    if (selectedSession.chunks.length === 0) {
+      toast.message(t('sketches.summaryNoSegments'))
+      return
+    }
+    toast.success(t('sketches.summaryQueuedToast'))
+  }, [activeSession, selectedSession, t])
+
   const liveElapsed = activeSession
     ? formatElapsed(clockMs - new Date(activeSession.startedAt).getTime())
     : '00:00:00'
   const liveClock = activeSession ? formatLiveClock(clockMs) : ''
 
   return (
-    <div className="relative flex h-[calc(100dvh-7rem)] min-h-[28rem] max-w-full min-w-0 flex-col gap-3">
+    <div className="relative flex min-h-0 flex-1 flex-col gap-3 pt-3 max-w-full">
       <div className="flex shrink-0 flex-col gap-2 rounded-xl border bg-card px-4 py-3 shadow-sm">
         <div className="flex flex-nowrap items-center gap-2">
           <Button
@@ -248,26 +271,43 @@ export default function SketchesPage() {
         </div>
       </div>
 
-      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(12rem,22rem)_minmax(0,1fr)] gap-3">
-        <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(12rem,22rem)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-3">
+        <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
           {selectedSession ? (
             <>
-              <div className="flex min-w-0 items-center gap-2 border-b px-3 py-2.5">
-                {activeSession ? (
-                  <p className="min-w-0 flex-1 truncate text-xs leading-snug sm:text-sm">
-                    <span className="text-muted-foreground">{t('sketches.idLabel')}</span>
-                    <span className="text-muted-foreground"> · </span>
-                    <span className="font-mono font-semibold text-foreground">
-                      {activeSession.sessionId}
-                    </span>
-                    <span className="text-muted-foreground"> · </span>
-                    <span className="font-mono">
-                      {formatToMinute(new Date(activeSession.startedAt).getTime())}
-                    </span>
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">总结区当前为占位，P0 不开放编辑。</p>
-                )}
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-3 py-2.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                  onClick={onSessionSummarize}
+                >
+                  <Sparkles className="size-4 shrink-0" aria-hidden />
+                  {t('sketches.summaryAiButton')}
+                </Button>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 shrink-0"
+                      title={t('sketches.summaryPromptLabel')}
+                      aria-label={t('sketches.summaryPromptLabel')}
+                    >
+                      <ScrollText className="size-4" aria-hidden />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-h-[min(85vh,36rem)] sm:max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>{t('sketches.summaryPromptLabel')}</DialogTitle>
+                    </DialogHeader>
+                    <div className="max-h-[min(60vh,24rem)] overflow-y-auto rounded-md border bg-muted/40 px-3 py-2.5 text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+                      {t('sketches.summaryPromptDefault')}
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
               <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
                 {selectedSession.chunks.length === 0 ? (
@@ -279,12 +319,20 @@ export default function SketchesPage() {
                     const selected = resolvedChunkId === seg.chunkId
                     const timeRange = `${formatHm(new Date(seg.startedAt).getTime(), locale)} – ${formatHm(new Date(seg.endedAt).getTime(), locale)}`
                     return (
-                      <button
+                      <div
                         key={seg.chunkId}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={selected}
                         onClick={() => setSelectedChunkId(seg.chunkId)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setSelectedChunkId(seg.chunkId)
+                          }
+                        }}
                         className={cn(
-                          'no-drag w-full rounded-lg border p-3 text-left text-sm transition-colors relative',
+                          'no-drag relative w-full cursor-pointer rounded-lg border p-3 text-left text-sm transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
                           selected
                             ? 'border-primary bg-muted/60 shadow-sm'
                             : 'border-border bg-background hover:bg-muted/40',
@@ -330,7 +378,7 @@ export default function SketchesPage() {
                             </Button>
                           </div>
                         </div>
-                      </button>
+                      </div>
                     )
                   })
                 )}
@@ -339,11 +387,11 @@ export default function SketchesPage() {
           ) : null}
         </aside>
 
-        <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
+        <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
           <Tabs
             value={rightTab}
             onValueChange={(v) => setRightTab(v as 'summary' | 'details')}
-            className="flex h-full min-h-0 flex-col gap-0"
+            className="flex min-h-0 flex-1 flex-col gap-0"
           >
             <div className="shrink-0 border-b px-4 pt-3">
               <TabsList>

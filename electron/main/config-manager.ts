@@ -45,6 +45,7 @@ const defaultConfig: AppConfig = {
     language: 'auto',
     qwenApiKey: '',
     qwenRegion: 'cn',
+    qwenSubmitUrl: '',
   },
   hotkey: {
     pttKey: DEFAULT_HOTKEYS.PTT,

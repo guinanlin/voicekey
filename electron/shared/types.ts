@@ -33,6 +33,8 @@ export interface ASRConfig {
   qwenApiKey?: string
   /** cn=北京；intl=新加坡；us=美国（弗吉尼亚），模型为 qwen3-asr-flash-us */
   qwenRegion?: 'cn' | 'intl' | 'us'
+  /** 千问同步 multimodal-generation 完整 URL；留空则按 qwenRegion 使用官方默认地址 */
+  qwenSubmitUrl?: string
 }
 
 export interface HotkeyConfig {

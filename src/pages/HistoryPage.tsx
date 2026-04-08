@@ -157,15 +157,15 @@ export default function HistoryPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center py-4">
         <p className="text-muted-foreground">{t('history.loading')}</p>
       </div>
     )
   }
 
   return (
-    <div className="flex max-w-4xl flex-col h-full -my-6">
-      <div className="flex items-center justify-between gap-4 shrink-0 pb-2 mb-2 pt-6">
+    <div className="flex max-w-4xl flex-col h-full -mb-6">
+      <div className="mb-2 flex shrink-0 items-center justify-between gap-4 py-4">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="relative flex-1 max-w-xs group/search">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/70 group-focus-within/search:text-primary transition-colors" />

@@ -13,7 +13,7 @@ shadcn/ui 组件库，基于 Radix UI 原语构建的可复用 UI 组件集合�
 
 ### 表单组件
 
-- `button.tsx` - 按钮（多种变体：default, destructive, outline, secondary, ghost, link）
+- `button.tsx` - 按钮（`forwardRef`，兼容 Radix `asChild`；变体：default, destructive, outline, secondary, ghost, link）
 - `input.tsx` - 文本输入框
 - `label.tsx` - 表单标签
 - `select.tsx` - 下拉选择器

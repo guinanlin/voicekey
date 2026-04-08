@@ -204,12 +204,13 @@ export default function MainLayout({ children, currentRoute }: MainLayoutProps) 
           </div>
         </aside>
 
-        {/* 右侧：页面内容 */}
-        <main className="flex-1 pl-0">
-          {/* 外层：圆角 + 裁剪 */}
-          <div className="h-full rounded-lg bg-background overflow-hidden">
-            {/* 内层：滚动 + 内边距 */}
-            <div className="h-full overflow-auto px-8 py-6">{children}</div>
+        {/* 右侧：页面内容（flex 链 + min-h-0 让子页面可用 flex-1 / h-full 吃满高度） */}
+        <main className="flex min-h-0 flex-1 flex-col pl-0">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-background">
+            {/* 顶无 padding（pt-0）；左右 px-4；底 pb-6；各路由页自行 pt-6 */}
+            <div className="flex min-h-0 flex-1 flex-col overflow-auto px-4 pb-6 pt-0">
+              {children}
+            </div>
           </div>
         </main>
       </div>

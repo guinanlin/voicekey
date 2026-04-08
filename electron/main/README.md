@@ -8,7 +8,7 @@ Electron 主进程目录，负责窗口管理、IPC、录音流程、ASR 调用�
 - `i18n.ts` - 主进程 i18next 初始化与语言切换。
 - `config-manager.ts` - 使用 `electron-store` 持久化应用偏好、ASR 配置、快捷键与 ERPNextCN DTY 上传配置。
 - `erpnextcn-upload.ts` - 通用 multipart 上传（`contentType` 由调用方指定）；千问用 `audio/webm`，GLM 归档用 `audio/mpeg`。`fileUrlFromErpnextUploadResponse` 从成功响应拼公网 HTTPS URL 供 DashScope `audio` 使用。
-- `qwen-asr-provider.ts` - 阿里云 DashScope **短音频同步** ASR：`POST .../services/aigc/multimodal-generation/generation`，`input.messages` 中带公网 `audio` URL；解析 `output.choices[0].message.content` 中的 `text`。模型按地域为 `qwen3-asr-flash` 或 `qwen3-asr-flash-us`。含 `testQwenDashScopeConnection`。
+- `qwen-asr-provider.ts` - 阿里云 DashScope **短音频同步** ASR：`POST .../multimodal-generation/generation`（URL 可由 `asr.qwenSubmitUrl` 覆盖，否则按地域拼官方地址），`input.messages` 中带公网 `audio` URL；解析 `output.choices[0].message.content` 中的 `text`。模型按地域为 `qwen3-asr-flash` 或 `qwen3-asr-flash-us`。含 `testQwenDashScopeConnection`。
 - `flash-note-repository.ts` - 闪记 SQLite 仓储层：初始化 `flash_sessions` / `flash_chunks` 表与索引，封装会话/分片的查询与状态更新。
 - `history-manager.ts` - 录音历史存储（最多 1000 条），提供增删清空与统计接口。
 - `hotkey-manager.ts` - 基于 `globalShortcut` 的全局快捷键注册/注销。

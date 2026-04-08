@@ -5,6 +5,12 @@ import type { TranscriptionResult } from './asr-provider'
 
 const SYNC_REQUEST_TIMEOUT_MS = 120_000
 
+function resolveQwenMultimodalUrl(config: ASRConfig): string {
+  const custom = config.qwenSubmitUrl?.trim()
+  if (custom) return custom
+  return qwenMultimodalGenerationUrl(config.qwenRegion)
+}
+
 function getOutput(data: unknown): Record<string, unknown> | null {
   if (!data || typeof data !== 'object') return null
   const out = (data as Record<string, unknown>).output
@@ -59,7 +65,7 @@ export async function transcribeQwenFromFileUrl(
     throw new Error('Qwen ASR: API key is empty')
   }
 
-  const url = qwenMultimodalGenerationUrl(config.qwenRegion)
+  const url = resolveQwenMultimodalUrl(config)
   const model = qwenShortAsrModelName(config.qwenRegion)
 
   const asrOptions: Record<string, unknown> = {
@@ -125,7 +131,7 @@ export async function testQwenDashScopeConnection(config: ASRConfig): Promise<bo
   const apiKey = config.qwenApiKey?.trim()
   if (!apiKey) return false
 
-  const url = qwenMultimodalGenerationUrl(config.qwenRegion)
+  const url = resolveQwenMultimodalUrl(config)
   const model = qwenShortAsrModelName(config.qwenRegion)
 
   try {

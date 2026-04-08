@@ -4,7 +4,7 @@
 
 ## 文件
 
-- `HomePage.tsx` - 首页仪表盘：显示 PTT 提示、历史统计汇总与区间趋势图。
-- `SketchesPage.tsx` - 闪记工作台：接入主进程闪记 IPC 与 SQLite 数据；支持开始/结束会话、显示进行中时长、浏览分片状态/转写文本，并在分片行提供播放与下载动作；总结区在 P0 为占位展示。
-- `SettingsPage.tsx` - 设置页：应用偏好（含 `audioCapture`：Opus 码率、单声道、回声消除、噪声抑制、自动增益 AGC、约束回退与组合告警）、大模型（GLM / 千问）、存储（ERPNextCN + 与录音设置联动说明）、快捷键、关于；保存写入 `app` / `asr` / `erpnextcnDty`。
-- `HistoryPage.tsx` - 历史记录页：搜索/排序/分组展示，支持复制、删除与清空。
+- `HomePage.tsx` - 首页仪表盘：`pt-6` 顶留白；PTT 提示、历史统计与趋势图。
+- `SketchesPage.tsx` - 闪记工作台：`pt-3` 顶留白；IPC/SQLite、分片播放下载、左侧总结/提示词、右侧占位正文。
+- `SettingsPage.tsx` - 设置页：主布局滚动区 `pt-0`；Tab 吸顶条 `py-3`、`border-b`，`TabsTrigger` `text-sm` / `h-8`；`TabsContent` `mt-4`；应用偏好 / 大模型 / 存储 / 快捷键 / 关于；保存 `app` / `asr` / `erpnextcnDty`。
+- `HistoryPage.tsx` - 历史记录页：`-mb-6` 底延伸；工具栏 `py-4` 上下对称；搜索/排序/分组、复制删除清空。
