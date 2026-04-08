@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.33](https://github.com/guinanlin/voicekey/compare/v0.2.32...v0.2.33) (2026-04-08)
+
+### Features
+
+- **ui:** polish settings, sketches, and main content chrome ([d173fc8](https://github.com/guinanlin/voicekey/commit/d173fc84ef2f7097b8215c5907cc83eb0414fae5))
+
 ### [0.2.32](https://github.com/guinanlin/voicekey/compare/v0.2.31...v0.2.32) (2026-04-07)
 
 ### Features
