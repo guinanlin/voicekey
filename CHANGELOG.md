@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.35](https://github.com/guinanlin/voicekey/compare/v0.2.34...v0.2.35) (2026-04-09)
+
+### Features
+
+- **flash:** add DashScope summary and text LLM client ([00eb68d](https://github.com/guinanlin/voicekey/commit/00eb68dd1e68b48eee64989012e7e82eee7ad8f7))
+
 ### [0.2.34](https://github.com/guinanlin/voicekey/compare/v0.2.33...v0.2.34) (2026-04-09)
 
 ### Bug Fixes
