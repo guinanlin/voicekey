@@ -3,7 +3,8 @@
   $schema: 'https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json',
   appId: 'com.buildwithais.voice-key',
   asar: true,
-  productName: 'Voice Key',
+  // 无空格：Linux deb 安装到 /opt/${productName}，含空格会触发 Chromium/Electron 子进程路径截断
+  productName: 'VoiceKey',
   directories: {
     output: 'release/${version}',
     buildResources: 'build',
@@ -23,6 +24,8 @@
     target: ['dmg'],
     artifactName: '${productName}-Mac-${version}-${arch}.${ext}',
     extendInfo: {
+      CFBundleDisplayName: 'Voice Key',
+      CFBundleName: 'Voice Key',
       NSMicrophoneUsageDescription: 'Voice Key 需要访问麦克风以进行语音转文字录制。',
       NSAccessibilityUsageDescription: 'Voice Key 需要辅助功能权限以将转录后的文字自动输入到当前窗口。',
     },
@@ -35,6 +38,7 @@
     format: 'UDZO',
   },
   win: {
+    executableName: 'voice-key',
     target: [
       {
         target: 'nsis',
@@ -55,6 +59,11 @@
     artifactName: '${productName}-Linux-${version}-${arch}.${ext}',
     icon: 'build/icons/png',
     category: 'Utility',
+    executableName: 'voice-key',
+    desktop: {
+      Name: 'Voice Key',
+      StartupWMClass: 'voice-key',
+    },
   },
   publish: {
     provider: 'github',

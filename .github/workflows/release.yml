@@ -323,11 +323,11 @@ jobs:
             **注意：本项目暂无商业签名证书，安装时可能会提示安全警告。**
 
             ### 🍎 macOS 用户
-            下载对应架构的 `.zip`（arm64 / x64），解压后将 **Voice Key.app** 拖入「应用程序」。  
+            下载对应架构的 `.zip`（arm64 / x64），解压后将 **VoiceKey.app** 拖入「应用程序」（访达中展示名仍为「Voice Key」）。  
             若出现 “应用已损坏，无法打开” 或 “来自身份不明的开发者”，请打开「终端」执行：
 
             ```bash
-            xattr -cr /Applications/Voice\ Key.app
+            xattr -cr /Applications/VoiceKey.app
             ```
 
             ### 🪟 Windows 用户
