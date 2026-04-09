@@ -245,6 +245,10 @@ export function AudioRecorder() {
           if (mr.state === 'recording') mr.stop()
         }, 50)
       } else {
+        // 主进程已为闪记写入 stoppedCaptureContext；若从未收到 SESSION_START（如恢复过早），须回传缓冲区才能走完 finalize
+        if (lastCaptureModeRef.current === 'flash') {
+          api.sendAudioData(new ArrayBuffer(0))
+        }
         releaseResources()
       }
     })

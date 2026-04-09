@@ -3,13 +3,15 @@ import { CheckCircle2, XCircle, AlertTriangle, Eye, EyeOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   AUDIO_CAPTURE_OPUS_BITRATE_OPTIONS,
+  DASHSCOPE,
   DEFAULT_AUDIO_CAPTURE_PREFERENCES,
   ERPNEXTCN_DTY,
   qwenMultimodalGenerationUrl,
   qwenShortAsrModelName,
+  qwenCompatibleChatCompletionsUrl,
 } from '@electron/shared/constants'
 import { resolveLanguage, type LanguageSetting } from '@electron/shared/i18n'
-import type { AppConfig, UpdateInfo } from '@electron/shared/types'
+import type { AppConfig, QwenCnIntlFlashModelId, UpdateInfo } from '@electron/shared/types'
 import { HotkeySettings } from '@/components/HotkeySettings'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -57,6 +59,12 @@ export default function SettingsPage() {
       host: '',
       apiKey: '',
     },
+    textLlm: {
+      model: DASHSCOPE.TEXT_LLM_DEFAULT_MODEL,
+      region: 'cn',
+      apiKey: '',
+      generationUrl: '',
+    },
   })
 
   const [testing, setTesting] = useState(false)
@@ -68,6 +76,7 @@ export default function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false)
   const [showErpnextcnKey, setShowErpnextcnKey] = useState(false)
   const [showQwenApiKey, setShowQwenApiKey] = useState(false)
+  const [showTextLlmApiKey, setShowTextLlmApiKey] = useState(false)
   const hasLoadedConfig = useRef(false)
   const hasLoadedUpdateStatus = useRef(false)
 
@@ -129,6 +138,7 @@ export default function SettingsPage() {
         app: config.app,
         asr: config.asr,
         erpnextcnDty: config.erpnextcnDty,
+        textLlm: config.textLlm,
       })
 
       setTestResult({ type: 'success', message: t('settings.result.saveSuccess') })
@@ -218,6 +228,7 @@ export default function SettingsPage() {
   const currentRegion = config.asr.region || 'cn'
   const currentApiKey = config.asr.apiKeys?.[currentRegion] || ''
   const qwenDefaultMultimodalUrl = qwenMultimodalGenerationUrl(config.asr.qwenRegion)
+  const textLlmDefaultGenerationUrl = qwenCompatibleChatCompletionsUrl(config.textLlm.region)
   const glmDefaultEndpoint =
     currentRegion === 'intl'
       ? 'https://api.z.ai/api/paas/v4/audio/transcriptions'
@@ -870,6 +881,7 @@ export default function SettingsPage() {
                             ...prev.asr,
                             qwenRegion: value as 'cn' | 'intl' | 'us',
                             qwenSubmitUrl: '',
+                            ...(value === 'us' ? { qwenCnIntlFlashModel: undefined } : {}),
                           },
                         }))
                       }
@@ -884,6 +896,40 @@ export default function SettingsPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {config.asr.qwenRegion === 'cn' || config.asr.qwenRegion === 'intl' ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="qwenCnIntlFlashModel">
+                        {t('settings.qwenFlashModelLabel')}
+                      </Label>
+                      <Select
+                        value={config.asr.qwenCnIntlFlashModel ?? 'qwen3-asr-flash'}
+                        onValueChange={(value) =>
+                          setConfig((prev) => ({
+                            ...prev,
+                            asr: {
+                              ...prev.asr,
+                              qwenCnIntlFlashModel: value as QwenCnIntlFlashModelId,
+                            },
+                          }))
+                        }
+                      >
+                        <SelectTrigger
+                          id="qwenCnIntlFlashModel"
+                          className="no-drag w-full cursor-pointer"
+                        >
+                          <SelectValue placeholder={t('settings.languagePlaceholder')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="qwen3-asr-flash">
+                            {t('settings.qwenFlashModelDefault')}
+                          </SelectItem>
+                          <SelectItem value="qwen3-asr-flash-2026-02-10">
+                            {t('settings.qwenFlashModel20260210')}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
                   <div className="space-y-2">
                     <Label htmlFor="qwenSubmitUrl">{t('settings.qwenSubmitEndpoint')}</Label>
                     <Input
@@ -905,7 +951,11 @@ export default function SettingsPage() {
                       {t('settings.qwenSubmitEndpointHelp')}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {t('settings.qwenModelLabel')}: {qwenShortAsrModelName(config.asr.qwenRegion)}
+                      {t('settings.qwenModelLabel')}:{' '}
+                      {qwenShortAsrModelName(
+                        config.asr.qwenRegion,
+                        config.asr.qwenCnIntlFlashModel,
+                      )}
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -946,6 +996,127 @@ export default function SettingsPage() {
                   </div>
                 </div>
               ) : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl font-bold">{t('settings.textLlmTitle')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="border-muted-foreground/25 bg-muted/40">
+                <AlertDescription className="text-sm text-muted-foreground">
+                  {t('settings.textLlmHint')}
+                </AlertDescription>
+              </Alert>
+              <div className="space-y-2">
+                <Label htmlFor="textLlmModel">{t('settings.textLlmModelLabel')}</Label>
+                <Input
+                  id="textLlmModel"
+                  value={config.textLlm.model}
+                  onChange={(e) =>
+                    setConfig((prev) => ({
+                      ...prev,
+                      textLlm: { ...prev.textLlm, model: e.target.value },
+                    }))
+                  }
+                  placeholder={t('settings.textLlmModelPlaceholder')}
+                  className="no-drag font-mono text-sm"
+                  autoComplete="off"
+                />
+                <p className="text-sm text-muted-foreground">{t('settings.textLlmModelHelp')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="textLlmRegion">{t('settings.textLlmRegionLabel')}</Label>
+                <Select
+                  value={config.textLlm.region}
+                  onValueChange={(value) =>
+                    setConfig((prev) => ({
+                      ...prev,
+                      textLlm: {
+                        ...prev.textLlm,
+                        region: value as 'cn' | 'intl' | 'us',
+                        generationUrl: '',
+                      },
+                    }))
+                  }
+                >
+                  <SelectTrigger id="textLlmRegion" className="no-drag w-full cursor-pointer">
+                    <SelectValue placeholder={t('settings.languagePlaceholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cn">{t('settings.qwenRegionCn')}</SelectItem>
+                    <SelectItem value="intl">{t('settings.qwenRegionIntl')}</SelectItem>
+                    <SelectItem value="us">{t('settings.qwenRegionUs')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="textLlmGenerationUrl">{t('settings.textLlmEndpointLabel')}</Label>
+                <Input
+                  id="textLlmGenerationUrl"
+                  type="url"
+                  inputMode="url"
+                  autoComplete="off"
+                  value={config.textLlm.generationUrl ?? ''}
+                  onChange={(e) =>
+                    setConfig((prev) => ({
+                      ...prev,
+                      textLlm: { ...prev.textLlm, generationUrl: e.target.value },
+                    }))
+                  }
+                  placeholder={textLlmDefaultGenerationUrl}
+                  className="no-drag font-mono text-sm"
+                />
+                <p className="text-sm text-muted-foreground">{t('settings.textLlmEndpointHelp')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="textLlmApiKey">{t('settings.textLlmApiKey')}</Label>
+                <div className="relative">
+                  <Input
+                    id="textLlmApiKey"
+                    type={showTextLlmApiKey ? 'text' : 'password'}
+                    value={config.textLlm.apiKey}
+                    onChange={(e) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        textLlm: { ...prev.textLlm, apiKey: e.target.value },
+                      }))
+                    }
+                    placeholder={t('settings.qwenApiKeyPlaceholder')}
+                    className="no-drag pr-10"
+                    autoComplete="off"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 size-7 text-muted-foreground hover:text-foreground no-drag"
+                    onClick={() => setShowTextLlmApiKey((v) => !v)}
+                    aria-label={
+                      showTextLlmApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')
+                    }
+                    title={showTextLlmApiKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
+                  >
+                    {showTextLlmApiKey ? (
+                      <EyeOff className="size-4" aria-hidden />
+                    ) : (
+                      <Eye className="size-4" aria-hidden />
+                    )}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.textLlmApiKeyHelp')}{' '}
+                  <a
+                    href="https://help.aliyun.com/zh/model-studio/get-api-key"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    help.aliyun.com
+                  </a>
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

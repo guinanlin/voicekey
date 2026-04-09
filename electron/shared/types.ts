@@ -14,6 +14,9 @@ export interface VoiceSession {
 
 export type ASRProviderId = 'glm' | 'qwen'
 
+/** 中国大陆 / 国际（新加坡）地域下的千问 Flash 模型；美国地域固定为 qwen3-asr-flash-us */
+export type QwenCnIntlFlashModelId = 'qwen3-asr-flash' | 'qwen3-asr-flash-2026-02-10'
+
 export interface ASRConfig {
   /** 当前用于语音转写的后端 */
   provider: ASRProviderId
@@ -35,6 +38,8 @@ export interface ASRConfig {
   qwenRegion?: 'cn' | 'intl' | 'us'
   /** 千问同步 multimodal-generation 完整 URL；留空则按 qwenRegion 使用官方默认地址 */
   qwenSubmitUrl?: string
+  /** cn/intl 下选用的 Flash 模型 ID；未设置时等同 qwen3-asr-flash */
+  qwenCnIntlFlashModel?: QwenCnIntlFlashModelId
 }
 
 export interface HotkeyConfig {
@@ -117,11 +122,46 @@ export interface ErpnextcnDtyConfig {
   apiKey: string
 }
 
+/** 闪记「总结」IPC 入参（system 提示词由渲染进程按界面语言传入） */
+export interface FlashGenerateSummaryPayload {
+  sessionId: string
+  systemPrompt: string
+}
+
+/** 与 `sketches.summaryError.*` 文案键一一对应（`request_failed` 另带 message） */
+export type FlashGenerateSummaryErrorCode =
+  | 'no_api_key'
+  | 'session_not_found'
+  | 'session_active'
+  | 'no_transcript'
+  | 'empty_response'
+  | 'request_failed'
+
+/** 闪记「总结」IPC 返回 */
+export type FlashGenerateSummaryResult =
+  | { ok: true; summary: string }
+  | { ok: false; code: FlashGenerateSummaryErrorCode; message?: string }
+
+/** DashScope 文本对话（默认 OpenAI 兼容 chat/completions；可选手写旧版 text-generation URL） */
+export interface TextLlmConfig {
+  /** 模型名，默认 qwen-plus（与 text-generation 官方示例一致；compatible-mode 可换 qwen3.5-flash） */
+  model: string
+  /** cn=北京；intl=新加坡；us=美国（弗吉尼亚） */
+  region: 'cn' | 'intl' | 'us'
+  apiKey: string
+  /**
+   * 完整请求 URL。留空则按 region 使用官方 **compatible-mode/v1/chat/completions**。
+   * 若填写含 `.../text-generation/generation` 的地址，则按旧版 DashScope 文本生成协议请求。
+   */
+  generationUrl?: string
+}
+
 export interface AppConfig {
   app: AppPreferences
   asr: ASRConfig
   hotkey: HotkeyConfig
   erpnextcnDty: ErpnextcnDtyConfig
+  textLlm: TextLlmConfig
 }
 
 export interface HistoryItem {
@@ -193,6 +233,7 @@ export const IPC_CHANNELS = {
   FLASH_START: 'flash:start',
   FLASH_END: 'flash:end',
   FLASH_UPDATE_SUMMARY: 'flash:update-summary',
+  FLASH_GENERATE_SUMMARY: 'flash:generate-summary',
   FLASH_DOWNLOAD_CHUNK: 'flash:download-chunk',
   FLASH_PLAY_CHUNK: 'flash:play-chunk',
   FLASH_STATE_CHANGED: 'flash:state-changed',

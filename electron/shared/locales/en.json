@@ -24,8 +24,9 @@
     "recordTitle": "Flash note ID {{id}}",
     "summaryAiButton": "Summarize",
     "summaryPromptLabel": "Summary prompt",
-    "summaryPromptDefault": "You are an expert at turning voice and meeting transcripts into clear notes. Summarize every recording under this flash note: keep facts and decisions, do not invent content, use short headings and bullet points.",
-    "summaryQueuedToast": "Summary request recorded (API not wired yet).",
+    "summaryPromptDefault": "You summarize quick voice memos (flash notes). Below is the full transcript text from one or more segments. Produce a **tight, scannable summary** of only what matters from the transcript; short headings and bullet lists are fine.\n\nRules:\n1. Stick to facts in the transcript—no guessing or invented detail.\n2. No meta commentary: no disclaimers, no \"there was no meeting\"-style remarks, no test-recording notes, no checkmark/cross decorations, no \"important notice\" blocks, no self-review paragraphs.\n3. Be concise: high information density, short sentences, no filler; merge points instead of padding structure.",
+    "summarySuccessToast": "Summary saved.",
+    "summaryGenerating": "Generating…",
     "summaryNeedEndFirst": "End the current session before summarizing.",
     "summaryNoSegments": "No segments under this note; nothing to summarize.",
     "summaryNoSession": "Select or start a flash note before summarizing.",
@@ -34,7 +35,15 @@
     "tabDetails": "Details",
     "noSegmentSelected": "Select a segment on the left to see summary and details.",
     "summaryIntro": "AI summary, audit conclusions, or highlights for the selected segment will appear here.",
-    "detailsIntro": "Transcripts, metadata, and key markers will appear here."
+    "detailsIntro": "Transcripts, metadata, and key markers will appear here.",
+    "summaryError": {
+      "no_api_key": "Add your DashScope API key under Settings (text generation).",
+      "session_not_found": "That flash note session was not found.",
+      "session_active": "End the current session before summarizing.",
+      "no_transcript": "No successful transcripts to summarize.",
+      "empty_response": "The model returned no summary. Try again later.",
+      "request_failed": "Summary failed: {{message}}"
+    }
   },
   "layout": {
     "collapseSidebar": "Collapse sidebar",
@@ -129,6 +138,16 @@
     "asrBackendLabel": "Active model",
     "asrBackendGlm": "GLM ASR (Zhipu)",
     "asrBackendQwen": "Qwen3 ASR Flash (DashScope)",
+    "textLlmTitle": "Text recognition model",
+    "textLlmHint": "Flash summaries: empty URL uses compatible-mode. If you set …/text-generation/generation, use a text-generation model such as qwen-plus (not qwen3.5-flash — url error). Key region must match endpoint.",
+    "textLlmModelLabel": "Model name",
+    "textLlmModelPlaceholder": "qwen-plus",
+    "textLlmModelHelp": "Default qwen-plus (matches text-generation docs). On compatible-mode you may use qwen3.5-flash, etc., per Model Studio.",
+    "textLlmRegionLabel": "DashScope region",
+    "textLlmEndpointLabel": "Text generation API URL",
+    "textLlmEndpointHelp": "Leave empty for the official compatible-mode chat/completions URL. For legacy DashScope text-generation, paste the full …/text-generation/generation URL.",
+    "textLlmApiKey": "API Key (DashScope)",
+    "textLlmApiKeyHelp": "Get API Key",
     "glmAsrCardTitle": "GLM ASR",
     "qwenAsrCardTitle": "Qwen3 ASR Flash",
     "qwenAsrHint": "Qwen uses DashScope short-audio synchronous recognition (lower latency). Recordings are WebM (Opus); they must be uploaded to ERPNextCN on the Storage tab to obtain a public HTTPS URL. Each clip must be ≤5 minutes and ≤10 MB. Use a US Model Studio API key when the US region is selected.",
@@ -138,6 +157,9 @@
     "qwenRegionUs": "United States (Virginia)",
     "qwenSubmitEndpoint": "Synchronous recognition API URL",
     "qwenSubmitEndpointHelp": "Leave empty to use the official DashScope URL for the selected region; if set, this full URL is used for ASR requests.",
+    "qwenFlashModelLabel": "Flash model version",
+    "qwenFlashModelDefault": "qwen3-asr-flash (default)",
+    "qwenFlashModel20260210": "qwen3-asr-flash-2026-02-10",
     "qwenModelLabel": "Model",
     "qwenApiKey": "API Key (DashScope)",
     "qwenApiKeyPlaceholder": "sk-…",
@@ -268,6 +290,7 @@
   },
   "tray": {
     "settings": "Settings",
+    "abandonFlash": "Abandon current flash session (if stuck)",
     "quit": "Quit",
     "tooltip": "Voice Key"
   },

@@ -105,15 +105,23 @@ export function HUD() {
 
   const displayElapsedSeconds = elapsedSecondsFromMain ?? elapsedSeconds
 
+  const finishRecording = () => {
+    if (mode === 'flash') {
+      void window.electronAPI?.endFlashSession?.()
+    } else {
+      void window.electronAPI?.stopSession?.()
+    }
+  }
+
   const handleCancel = () => {
     if (status === 'recording') {
-      void window.electronAPI?.stopSession?.()
+      finishRecording()
     }
   }
 
   const handleConfirm = () => {
     if (status === 'recording') {
-      void window.electronAPI?.stopSession?.()
+      finishRecording()
     }
   }
 
@@ -131,7 +139,11 @@ export function HUD() {
           ${isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95'}
         `}
         onMouseEnter={() => window.electronAPI?.setIgnoreMouseEvents?.(false)}
-        onMouseLeave={() => window.electronAPI?.setIgnoreMouseEvents?.(true, { forward: true })}
+        onMouseLeave={() => {
+          // 录音中勿恢复「点击穿透」，否则光标稍移出浮条即无法再点「结束」
+          if (status === 'recording') return
+          window.electronAPI?.setIgnoreMouseEvents?.(true, { forward: true })
+        }}
       >
         {/* Status Orb / Icon - 左侧状态球 */}
         <div

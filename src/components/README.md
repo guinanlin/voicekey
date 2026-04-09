@@ -26,7 +26,8 @@ shadcn/ui 组件库，基于 Radix UI 构建的可复用 UI 组件集合。包�
 
 - 显示录音状态和实时波形动画
 - 支持 PTT / 闪记两种模式：闪记态展示会话标识与主进程上报时长
-- 提供取消/完成操作按钮
+- 取消/完成：PTT 调 `stopSession`（SESSION_STOP）；**闪记调 `endFlashSession`（FLASH_END）**——勿对闪记只调 `stopSession`，否则主进程无 `currentSession` 会直接忽略
+- 主进程在 **`status === 'recording'`** 时对 overlay 调用 **`setIgnoreMouseEvents(false)`**（`showOverlay`/`updateOverlay`），否则窗口默认可穿透点击，渲染进程永远收不到 `mouseenter`，结束按钮无法点击；`mouseleave` 在录音态不再恢复穿透
 - 展示处理中、成功或错误状态反馈；`noTextInjected` 时成功态不显示「已注入」
 - 自适应状态球和紧凑布局
 

@@ -185,7 +185,6 @@ export default tseslint.config(
 
       // 配置文件（可选择性检查）
       'vite.config.ts',
-      'vitest.config.ts',
       'eslint.config.mjs',
       'prettier.config.mjs',
       'commitlint.config.js',

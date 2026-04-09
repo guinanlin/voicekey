@@ -238,6 +238,27 @@ export class FlashNoteRepository {
     }))
   }
 
+  /** 单条会话 + 分片（按 chunk_index 升序），不存在则 null */
+  getSessionWithChunksById(sessionId: string): FlashSessionWithChunks | null {
+    const row = this.db
+      .prepare(
+        `SELECT
+          session_id AS sessionId,
+          started_at AS startedAt,
+          ended_at AS endedAt,
+          status AS status,
+          summary AS summary,
+          created_at AS createdAt,
+          updated_at AS updatedAt
+        FROM flash_sessions
+        WHERE session_id = ?`,
+      )
+      .get(sessionId) as FlashSessionRow | undefined
+
+    if (!row) return null
+    return { ...row, chunks: this.getChunksBySessionId(sessionId) }
+  }
+
   private getChunksBySessionId(sessionId: string): FlashChunk[] {
     return this.db
       .prepare(

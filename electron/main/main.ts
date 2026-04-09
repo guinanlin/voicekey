@@ -27,12 +27,13 @@ import { fileURLToPath } from 'node:url'
 import { UiohookKey } from 'uiohook-napi'
 import { ASRProvider } from './asr-provider'
 import { configManager } from './config-manager'
-import { DASHSCOPE, FLASH_NOTE } from '../shared/constants'
+import { DASHSCOPE, FLASH_NOTE, GLM_ASR, qwenShortAsrModelName } from '../shared/constants'
 import {
   fileUrlFromErpnextUploadResponse,
   uploadErpnextcnDtyFile,
   uploadErpnextcnDtyMp3,
 } from './erpnextcn-upload'
+import { generateTextWithTextLlm } from './dashscope-text-generation'
 import { testQwenDashScopeConnection, transcribeQwenFromFileUrl } from './qwen-asr-provider'
 import { historyManager } from './history-manager'
 import { hotkeyManager } from './hotkey-manager'
@@ -44,6 +45,8 @@ import { startHttpServer, stopHttpServer } from './http-server'
 import {
   ASRConfig,
   FlashChunkStatus,
+  FlashGenerateSummaryPayload,
+  FlashGenerateSummaryResult,
   IPC_CHANNELS,
   OverlayState,
   RecorderLockOwner,
@@ -184,6 +187,8 @@ function createMainWindow() {
   backgroundWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
     console.error('[Main] backgroundWindow failed to load:', errorCode, errorDescription)
   })
+
+  scheduleRecoverFlashSessionWhenBackgroundReady()
 }
 
 // 创建设置窗口
@@ -285,6 +290,30 @@ function createOverlayWindow() {
   return overlayWindow
 }
 
+/** 在后台页就绪后再恢复闪记，避免 SESSION_START 早于 AudioRecorder 挂载而丢失 */
+function scheduleRecoverFlashSessionWhenBackgroundReady(): void {
+  if (!backgroundWindow || backgroundWindow.isDestroyed()) return
+  const wc = backgroundWindow.webContents
+  const run = () => {
+    recoverFlashSessionIfNeeded()
+  }
+  if (wc.isLoading()) {
+    wc.once('did-finish-load', run)
+  } else {
+    queueMicrotask(run)
+  }
+}
+
+/** 录音 HUD 需可点击；若全程 setIgnoreMouseEvents(true)，事件穿透则永远收不到 mouseenter，结束按钮无效 */
+function setOverlayMouseInteractionForState(state: OverlayState): void {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return
+  if (state.status === 'recording') {
+    overlayWindow.setIgnoreMouseEvents(false)
+  } else {
+    overlayWindow.setIgnoreMouseEvents(true, { forward: true })
+  }
+}
+
 // 显示/隐藏/更新浮窗状态
 function showOverlay(state: OverlayState) {
   console.log(`[Main] 🔵 showOverlay:`, JSON.stringify(state))
@@ -292,11 +321,13 @@ function showOverlay(state: OverlayState) {
   const win = createOverlayWindow()
   win.webContents.send(IPC_CHANNELS.OVERLAY_UPDATE, state)
   win.showInactive()
+  setOverlayMouseInteractionForState(state)
 }
 
 function hideOverlay() {
   console.log(`[Main] 🔵 hideOverlay`)
   if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.setIgnoreMouseEvents(true, { forward: true })
     overlayWindow.hide()
   }
 }
@@ -315,6 +346,7 @@ function updateOverlay(state: OverlayState) {
   }
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send(IPC_CHANNELS.OVERLAY_UPDATE, state)
+    setOverlayMouseInteractionForState(state)
   }
 }
 
@@ -333,9 +365,17 @@ function isFlashActive(): boolean {
   return !!flashRuntime.sessionId
 }
 
+/** 与托盘「放弃闪记」enabled 同步；避免每个分片 DB 更新都重建菜单 */
+let lastTrayFlashActive: boolean | null = null
+
 function notifyFlashStateChanged(): void {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.webContents.send(IPC_CHANNELS.FLASH_STATE_CHANGED)
+  }
+  const active = isFlashActive()
+  if (active !== lastTrayFlashActive) {
+    lastTrayFlashActive = active
+    refreshLocalizedUi()
   }
 }
 
@@ -509,11 +549,40 @@ function updateAutoLaunchState(enable: boolean) {
 }
 
 // 创建托盘图标
+function abandonStuckFlashSession(): void {
+  const sid = flashRuntime.sessionId
+  if (!sid) return
+  console.log('[Main] abandonStuckFlashSession:', sid)
+  clearFlashTimers()
+  try {
+    if (backgroundWindow && !backgroundWindow.isDestroyed()) {
+      backgroundWindow.webContents.send(IPC_CHANNELS.SESSION_STOP)
+    }
+  } catch {
+    /* ignore */
+  }
+  flashRepository.updateSessionStatus(sid, 'failed', new Date().toISOString())
+  activeCaptureContext = null
+  stoppedCaptureContext = null
+  flashRuntime.sessionId = null
+  flashRuntime.startedAt = 0
+  flashRuntime.isEnding = false
+  flashRuntime.chunkIndex = 0
+  if (recorderLockOwner === 'flash') recorderLockOwner = 'none'
+  hideOverlay()
+  notifyFlashStateChanged()
+}
+
 const buildTrayMenu = () =>
   Menu.buildFromTemplate([
     {
       label: t('tray.settings'),
       click: () => createSettingsWindow(),
+    },
+    {
+      label: t('tray.abandonFlash'),
+      enabled: isFlashActive(),
+      click: () => abandonStuckFlashSession(),
     },
     { type: 'separator' },
     {
@@ -842,6 +911,17 @@ async function handleStartRecording() {
 
 // 处理停止录音
 async function handleStopRecording() {
+  // 闪记录音没有 currentSession（PTT 专用）；浮层若仍调用 SESSION_STOP，则转为结束闪记
+  if (isFlashActive()) {
+    try {
+      await endFlashSession()
+    } catch (error) {
+      console.error('[Main] endFlashSession (from SESSION_STOP) failed:', error)
+      showErrorAndHide(error instanceof Error ? error.message : t('errors.stopFailed'))
+    }
+    return
+  }
+
   if (!currentSession || currentSession.status !== 'recording') {
     console.log(
       '[Main] handleStopRecording called but no active session or not recording. Status:',
@@ -960,8 +1040,10 @@ async function handlePTTAudioData(buffer: Buffer) {
         throw new Error(t('errors.qwenNeedsErpnextUpload'))
       }
       const asrStartTime = Date.now()
+      const qwenModelId = qwenShortAsrModelName(asrCfg.qwenRegion, asrCfg.qwenCnIntlFlashModel)
+      const qwenRegionLabel = asrCfg.qwenRegion ?? 'cn'
       console.log(
-        `[Main] [${new Date().toISOString()}] Qwen: ERPNextCN upload WebM/Opus then DashScope multimodal sync...`,
+        `[Main] [${new Date().toISOString()}] Qwen: ERPNextCN upload WebM/Opus then DashScope multimodal sync... (model=${qwenModelId}, dashscopeRegion=${qwenRegionLabel})`,
       )
       const uploadData = await uploadErpnextcnDtyFile(tempWebmPath, erpResolved, {
         contentType: 'audio/webm',
@@ -998,7 +1080,9 @@ async function handlePTTAudioData(buffer: Buffer) {
 
       const erpResolved = configManager.getErpnextcnDtyResolvedForUpload()
       const asrStartTime = Date.now()
-      console.log(`[Main] [${new Date().toISOString()}] Parallel: ERPNextCN upload + ASR...`)
+      console.log(
+        `[Main] [${new Date().toISOString()}] Parallel: ERPNextCN upload + ASR... (provider=glm, model=${GLM_ASR.MODEL})`,
+      )
 
       const glmAsr = asrProvider
       if (!glmAsr) throw new Error('ASR Provider initialization failed')
@@ -1017,6 +1101,7 @@ async function handlePTTAudioData(buffer: Buffer) {
     }
 
     console.log(`[Main] [${new Date().toISOString()}] Transcription received`)
+    console.log(`[Main] ASR model: ${transcription.model}`)
     console.log(`[Main] ⏱️  ASR transcription took ${asrDuration}ms`)
     console.log(
       '[Main] Transcription received (bytes):',
@@ -1155,6 +1240,7 @@ async function processFlashChunkAudio(
     console.log(`[Main] [${new Date().toISOString()}] Flash chunk transcription received`, {
       sessionId: context.sessionId,
       chunkId: context.chunkId,
+      model: transcription.model,
     })
     console.log(`[Main] ⏱️  Flash ASR transcription took ${asrDuration}ms`)
     console.log(
@@ -1278,6 +1364,9 @@ function setupIPCHandlers() {
     if (config.erpnextcnDty) {
       configManager.setErpnextcnDtyConfig(config.erpnextcnDty)
     }
+    if (config.textLlm) {
+      configManager.setTextLlmConfig(config.textLlm)
+    }
   })
 
   ipcMain.handle(IPC_CHANNELS.CONFIG_TEST, async (_event, config?: ASRConfig) => {
@@ -1330,6 +1419,73 @@ function setupIPCHandlers() {
     (_event, sessionId: string, summary: string) => {
       flashRepository.updateSessionSummary(sessionId, summary)
       notifyFlashStateChanged()
+    },
+  )
+
+  const FLASH_SUMMARY_CORPUS_MAX_CHARS = 200_000
+
+  ipcMain.handle(
+    IPC_CHANNELS.FLASH_GENERATE_SUMMARY,
+    async (_event, payload: FlashGenerateSummaryPayload): Promise<FlashGenerateSummaryResult> => {
+      const sessionId = typeof payload?.sessionId === 'string' ? payload.sessionId.trim() : ''
+      const systemPrompt =
+        typeof payload?.systemPrompt === 'string' ? payload.systemPrompt.trim() : ''
+      if (!sessionId) {
+        return { ok: false, code: 'session_not_found' }
+      }
+      if (!systemPrompt) {
+        return { ok: false, code: 'request_failed', message: 'Empty system prompt' }
+      }
+
+      const textLlm = configManager.getTextLlmConfig()
+      if (!textLlm.apiKey?.trim()) {
+        return { ok: false, code: 'no_api_key' }
+      }
+
+      const session = flashRepository.getSessionWithChunksById(sessionId)
+      if (!session) {
+        return { ok: false, code: 'session_not_found' }
+      }
+      if (session.status === 'recording' || session.status === 'flushing') {
+        return { ok: false, code: 'session_active' }
+      }
+
+      const sorted = [...session.chunks].sort((a, b) => a.chunkIndex - b.chunkIndex)
+      const blocks: string[] = []
+      for (const ch of sorted) {
+        if (ch.status !== 'success') continue
+        const tr = ch.transcript?.trim()
+        if (!tr) continue
+        blocks.push(`【录音 ${ch.chunkIndex}】\n${tr}`)
+      }
+      if (blocks.length === 0) {
+        return { ok: false, code: 'no_transcript' }
+      }
+
+      let userContent = `以下是本条闪记下各段录音的转写（按时间顺序）。请根据这些内容生成总结。\n\n${blocks.join('\n\n')}`
+      if (userContent.length > FLASH_SUMMARY_CORPUS_MAX_CHARS) {
+        console.warn(
+          `[flash-summary] Corpus truncated from ${userContent.length} to ${FLASH_SUMMARY_CORPUS_MAX_CHARS} chars`,
+        )
+        userContent = `${userContent.slice(0, FLASH_SUMMARY_CORPUS_MAX_CHARS)}\n\n[内容已截断]`
+      }
+
+      try {
+        const summaryText = await generateTextWithTextLlm(textLlm, [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userContent },
+        ])
+        const trimmed = summaryText.trim()
+        if (!trimmed) {
+          return { ok: false, code: 'empty_response' }
+        }
+        flashRepository.updateSessionSummary(sessionId, trimmed)
+        notifyFlashStateChanged()
+        return { ok: true, summary: trimmed }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        return { ok: false, code: 'request_failed', message }
+      }
     },
   )
 
@@ -1516,7 +1672,6 @@ app.whenReady().then(async () => {
   void UpdaterManager.checkForUpdates()
   registerGlobalHotkeys()
   ioHookManager.start()
-  recoverFlashSessionIfNeeded()
 
   // 启动 HTTP 服务器（监听 0.0.0.0，允许局域网访问）
   try {

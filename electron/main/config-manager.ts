@@ -5,8 +5,11 @@ import {
   ASRConfig,
   ErpnextcnDtyConfig,
   HotkeyConfig,
+  type QwenCnIntlFlashModelId,
+  type TextLlmConfig,
 } from '../shared/types'
 import {
+  DASHSCOPE,
   DEFAULT_AUDIO_CAPTURE_PREFERENCES,
   DEFAULT_HOTKEYS,
   ERPNEXTCN_DTY,
@@ -18,12 +21,18 @@ function normalizeQwenRegion(raw: unknown): QwenDashScopeRegion {
   return 'cn'
 }
 
+function normalizeQwenCnIntlFlashModel(raw: unknown): QwenCnIntlFlashModelId | undefined {
+  if (raw === 'qwen3-asr-flash' || raw === 'qwen3-asr-flash-2026-02-10') return raw
+  return undefined
+}
+
 // 配置Schema
 interface ConfigSchema {
   app: AppPreferences
   asr: ASRConfig
   hotkey: HotkeyConfig
   erpnextcnDty: ErpnextcnDtyConfig
+  textLlm: TextLlmConfig
 }
 
 // 默认配置
@@ -56,6 +65,12 @@ const defaultConfig: AppConfig = {
   erpnextcnDty: {
     host: '',
     apiKey: '',
+  },
+  textLlm: {
+    model: DASHSCOPE.TEXT_LLM_DEFAULT_MODEL,
+    region: 'cn',
+    apiKey: '',
+    generationUrl: '',
   },
 }
 
@@ -97,6 +112,18 @@ export class ConfigManager {
       this.store.set('asr.qwenApiKey', '')
     }
 
+    const textLlmRaw = this.store.get('textLlm') as TextLlmConfig | undefined
+    if (!textLlmRaw) {
+      this.store.set('textLlm', defaultConfig.textLlm)
+    } else {
+      const genUrl = (textLlmRaw.generationUrl ?? '').trim()
+      const usesLegacyTextGen = genUrl.includes('text-generation/generation')
+      const m = (textLlmRaw.model ?? '').trim()
+      if (usesLegacyTextGen && m === 'qwen3.5-flash') {
+        this.store.set('textLlm', { ...textLlmRaw, model: 'qwen-plus' })
+      }
+    }
+
     const appRaw = this.store.get('app') as AppPreferences
     if (appRaw && appRaw.audioCapture === undefined) {
       this.store.set('app', {
@@ -114,6 +141,7 @@ export class ConfigManager {
       asr: this.getASRConfig(),
       hotkey: this.getHotkeyConfig(),
       erpnextcnDty: this.getErpnextcnDtyFromStore(),
+      textLlm: this.getTextLlmConfig(),
     }
   }
 
@@ -165,6 +193,7 @@ export class ConfigManager {
       ...config,
       qwenApiKey: config.qwenApiKey ?? '',
       qwenRegion: normalizeQwenRegion(config.qwenRegion),
+      qwenCnIntlFlashModel: normalizeQwenCnIntlFlashModel(config.qwenCnIntlFlashModel),
     }
   }
 
@@ -206,6 +235,22 @@ export class ConfigManager {
   setErpnextcnDtyConfig(config: Partial<ErpnextcnDtyConfig>): void {
     const current = this.store.get('erpnextcnDty', defaultConfig.erpnextcnDty)
     this.store.set('erpnextcnDty', { ...current, ...config })
+  }
+
+  getTextLlmConfig(): TextLlmConfig {
+    const config = this.store.get('textLlm', defaultConfig.textLlm)
+    const modelTrim = config.model?.trim()
+    return {
+      model: modelTrim || DASHSCOPE.TEXT_LLM_DEFAULT_MODEL,
+      region: normalizeQwenRegion(config.region),
+      apiKey: config.apiKey ?? '',
+      generationUrl: config.generationUrl ?? '',
+    }
+  }
+
+  setTextLlmConfig(config: Partial<TextLlmConfig>): void {
+    const current = this.getTextLlmConfig()
+    this.store.set('textLlm', { ...current, ...config })
   }
 
   // 重置为默认配置

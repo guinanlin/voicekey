@@ -7,6 +7,7 @@ import {
   ASRConfig,
   UpdateInfo,
   FlashSessionWithChunks,
+  FlashGenerateSummaryResult,
   SessionStartPayload,
 } from '../shared/types'
 
@@ -42,6 +43,10 @@ export interface ElectronAPI {
   startFlashSession: () => Promise<{ sessionId: string }>
   endFlashSession: () => Promise<void>
   updateFlashSummary: (sessionId: string, summary: string) => Promise<void>
+  generateFlashSummary: (
+    sessionId: string,
+    systemPrompt: string,
+  ) => Promise<FlashGenerateSummaryResult>
   downloadFlashChunk: (chunkId: string) => Promise<{ savedPath: string | null }>
   playFlashChunk: (chunkId: string) => Promise<void>
   onFlashStateChanged: (callback: () => void) => () => void
@@ -123,6 +128,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   endFlashSession: () => ipcRenderer.invoke(IPC_CHANNELS.FLASH_END),
   updateFlashSummary: (sessionId: string, summary: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.FLASH_UPDATE_SUMMARY, sessionId, summary),
+  generateFlashSummary: (sessionId: string, systemPrompt: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.FLASH_GENERATE_SUMMARY, { sessionId, systemPrompt }),
   downloadFlashChunk: (chunkId: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.FLASH_DOWNLOAD_CHUNK, chunkId),
   playFlashChunk: (chunkId: string) => ipcRenderer.invoke(IPC_CHANNELS.FLASH_PLAY_CHUNK, chunkId),

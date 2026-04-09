@@ -44,6 +44,7 @@ IPC 通信桥接脚本，运行在渲染进程上下文但可访问部分 Node.j
 - `getFlashSessions()` / `getActiveFlashSession()` - 读取闪记历史会话与当前进行中会话（含分片）
 - `startFlashSession()` / `endFlashSession()` - 开始或结束闪记会话
 - `updateFlashSummary(sessionId, summary)` - 更新会话总结文本
+- `generateFlashSummary(sessionId, systemPrompt)` - 聚合成功分片转写并调用 DashScope（默认 compatible-mode chat/completions），写入 DB 后返回 `{ ok, summary? }` 或 `{ ok: false, code, message? }`
 - `downloadFlashChunk(chunkId)` / `playFlashChunk(chunkId)` - 下载分片音频或调用系统播放器打开
 - `onFlashStateChanged(callback)` - 会话或分片状态变化通知
 

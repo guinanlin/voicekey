@@ -1,6 +1,6 @@
 // 共享常量
 
-import type { AudioCapturePreferences } from './types'
+import type { AudioCapturePreferences, QwenCnIntlFlashModelId } from './types'
 
 // GLM ASR API 配置
 export const GLM_ASR = {
@@ -66,7 +66,21 @@ export const DASHSCOPE = {
   BASE_INTL: 'https://dashscope-intl.aliyuncs.com',
   BASE_US: 'https://dashscope-us.aliyuncs.com',
   MULTIMODAL_GENERATION_PATH: '/api/v1/services/aigc/multimodal-generation/generation',
+  /** 纯文本对话 / 文本生成（与 multimodal-generation 不同路径；部分新模型需用下方 compatible-mode） */
+  TEXT_GENERATION_PATH: '/api/v1/services/aigc/text-generation/generation',
+  /** OpenAI 兼容 Chat Completions（与旧版 text-generation 二选一） */
+  COMPATIBLE_CHAT_COMPLETIONS_PATH: '/compatible-mode/v1/chat/completions',
+  /**
+   * 闪记总结等默认模型：与官方 `text-generation/generation` 示例一致（qwen-plus）；
+   * 若使用 compatible-mode 可改为 qwen3.5-flash 等（见百炼模型列表）。
+   */
+  TEXT_LLM_DEFAULT_MODEL: 'qwen-plus',
+  /** 与控制台常见配置一致；非流式调用需配合 enable_thinking: false */
+  TEXT_LLM_DEFAULT_TEMPERATURE: 0.7,
+  TEXT_LLM_DEFAULT_TOP_P: 0.8,
   QWEN_ASR_SHORT_MODEL_CN_INTL: 'qwen3-asr-flash',
+  /** 与 QWEN_ASR_SHORT_MODEL_CN_INTL 同接口，较新快照版本 */
+  QWEN_ASR_SHORT_MODEL_CN_INTL_20260210: 'qwen3-asr-flash-2026-02-10',
   QWEN_ASR_SHORT_MODEL_US: 'qwen3-asr-flash-us',
   /** 千问短音频官方限制 */
   QWEN_SHORT_MAX_FILE_BYTES: 10 * 1024 * 1024,
@@ -81,12 +95,28 @@ export function qwenDashScopeBase(region: QwenDashScopeRegion | undefined): stri
   return DASHSCOPE.BASE_CN
 }
 
-export function qwenShortAsrModelName(region: QwenDashScopeRegion | undefined): string {
-  return (region ?? 'cn') === 'us'
-    ? DASHSCOPE.QWEN_ASR_SHORT_MODEL_US
-    : DASHSCOPE.QWEN_ASR_SHORT_MODEL_CN_INTL
+export function qwenShortAsrModelName(
+  region: QwenDashScopeRegion | undefined,
+  cnIntlFlashModel?: QwenCnIntlFlashModelId | undefined,
+): string {
+  if ((region ?? 'cn') === 'us') {
+    return DASHSCOPE.QWEN_ASR_SHORT_MODEL_US
+  }
+  if (cnIntlFlashModel === 'qwen3-asr-flash-2026-02-10') {
+    return DASHSCOPE.QWEN_ASR_SHORT_MODEL_CN_INTL_20260210
+  }
+  return DASHSCOPE.QWEN_ASR_SHORT_MODEL_CN_INTL
 }
 
 export function qwenMultimodalGenerationUrl(region: QwenDashScopeRegion | undefined): string {
   return `${qwenDashScopeBase(region)}${DASHSCOPE.MULTIMODAL_GENERATION_PATH}`
+}
+
+export function qwenTextGenerationUrl(region: QwenDashScopeRegion | undefined): string {
+  return `${qwenDashScopeBase(region)}${DASHSCOPE.TEXT_GENERATION_PATH}`
+}
+
+/** 百炼 OpenAI 兼容接口（默认文本 LLM 摘要等；地域需与 API Key 一致） */
+export function qwenCompatibleChatCompletionsUrl(region: QwenDashScopeRegion | undefined): string {
+  return `${qwenDashScopeBase(region)}${DASHSCOPE.COMPATIBLE_CHAT_COMPLETIONS_PATH}`
 }

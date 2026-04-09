@@ -66,7 +66,7 @@ export async function transcribeQwenFromFileUrl(
   }
 
   const url = resolveQwenMultimodalUrl(config)
-  const model = qwenShortAsrModelName(config.qwenRegion)
+  const model = qwenShortAsrModelName(config.qwenRegion, config.qwenCnIntlFlashModel)
 
   const asrOptions: Record<string, unknown> = {
     enable_itn: false,
@@ -132,7 +132,7 @@ export async function testQwenDashScopeConnection(config: ASRConfig): Promise<bo
   if (!apiKey) return false
 
   const url = resolveQwenMultimodalUrl(config)
-  const model = qwenShortAsrModelName(config.qwenRegion)
+  const model = qwenShortAsrModelName(config.qwenRegion, config.qwenCnIntlFlashModel)
 
   try {
     const res = await axios.post(
