@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.34](https://github.com/guinanlin/voicekey/compare/v0.2.33...v0.2.34) (2026-04-09)
+
+### Bug Fixes
+
+- **linux:** use space-free install dir for deb packaging ([703834b](https://github.com/guinanlin/voicekey/commit/703834b3c54d7df693b425bec9711164ea6d42e5))
+
 ### [0.2.33](https://github.com/guinanlin/voicekey/compare/v0.2.32...v0.2.33) (2026-04-08)
 
 ### Features
