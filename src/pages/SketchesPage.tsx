@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getLocale } from '@electron/shared/i18n'
-import { Download, Play, ScrollText, Sparkles } from 'lucide-react'
+import { Copy, Download, Play, ScrollText, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { FlashChunk, FlashSessionWithChunks } from '@electron/shared/types'
 
@@ -69,7 +70,10 @@ export default function SketchesPage() {
   const [selectedChunkId, setSelectedChunkId] = useState('')
   const [rightTab, setRightTab] = useState<'summary' | 'details'>('summary')
   const [summarizing, setSummarizing] = useState(false)
+  const [summaryDraft, setSummaryDraft] = useState('')
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const lastSummarySessionIdRef = useRef('')
+  const lastServerSummaryRef = useRef('')
 
   const loadFlashData = useCallback(async () => {
     const api = window.electronAPI
@@ -106,6 +110,64 @@ export default function SketchesPage() {
     if (activeSession) return activeSession
     return sessions.find((s) => s.sessionId === selectedSessionId) ?? sessions[0] ?? null
   }, [activeSession, sessions, selectedSessionId])
+
+  useEffect(() => {
+    const sid = selectedSession?.sessionId ?? ''
+    const sum = selectedSession?.summary ?? ''
+    if (!sid) {
+      setSummaryDraft('')
+      lastSummarySessionIdRef.current = ''
+      lastServerSummaryRef.current = ''
+      return
+    }
+    if (sid !== lastSummarySessionIdRef.current) {
+      lastSummarySessionIdRef.current = sid
+      lastServerSummaryRef.current = sum
+      setSummaryDraft(sum)
+      return
+    }
+    if (sum !== lastServerSummaryRef.current) {
+      lastServerSummaryRef.current = sum
+      setSummaryDraft(sum)
+    }
+  }, [selectedSession?.sessionId, selectedSession?.summary])
+
+  const persistSummaryIfChanged = useCallback(async () => {
+    const api = window.electronAPI
+    if (!api || !selectedSession || activeSession) return
+    const next = summaryDraft
+    const prev = selectedSession.summary ?? ''
+    if (next === prev) return
+    try {
+      await api.updateFlashSummary(selectedSession.sessionId, next)
+      lastServerSummaryRef.current = next
+      await loadFlashData()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('common.unknownError'))
+    }
+  }, [activeSession, loadFlashData, selectedSession, summaryDraft, t])
+
+  useEffect(() => {
+    if (!selectedSession?.sessionId || activeSession) return
+    const id = window.setTimeout(() => {
+      void persistSummaryIfChanged()
+    }, 800)
+    return () => clearTimeout(id)
+  }, [activeSession, persistSummaryIfChanged, selectedSession?.sessionId, summaryDraft])
+
+  const copySummary = useCallback(async () => {
+    const text = summaryDraft
+    if (!text.trim()) {
+      toast.message(t('sketches.summaryCopyEmpty'))
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success(t('sketches.summaryCopied'))
+    } catch {
+      toast.error(t('sketches.summaryCopyFailed'))
+    }
+  }, [summaryDraft, t])
 
   const resolvedChunkId = useMemo(() => {
     if (!selectedSession) return ''
@@ -435,30 +497,43 @@ export default function SketchesPage() {
             </div>
             <TabsContent
               value="summary"
-              className="m-0 min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3 data-[state=inactive]:hidden"
+              className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-4 pt-3 outline-none data-[state=inactive]:hidden"
             >
-              {selectedSession?.summary?.trim() ? (
-                <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-                  {selectedSession.summary.trim()}
-                </div>
-              ) : selectedChunk ? (
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <p className="text-foreground">
-                    {t('sketches.recordingFile', { n: selectedChunk.chunkIndex })}{' '}
-                    <span className="font-mono text-muted-foreground">
-                      (
-                      {`${formatHm(new Date(selectedChunk.startedAt).getTime(), locale)} – ${formatHm(new Date(selectedChunk.endedAt).getTime(), locale)}`}
-                      )
-                    </span>
-                  </p>
-                  <p>{t('sketches.summaryIntro')}</p>
-                </div>
-              ) : activeSession ? (
-                <p className="text-sm text-muted-foreground">
-                  {t('sketches.duringRecordingRight')}
-                </p>
-              ) : (
+              {!selectedSession ? (
                 <p className="text-sm text-muted-foreground">{t('sketches.noSegmentSelected')}</p>
+              ) : (
+                <div className="flex min-h-0 flex-1 flex-col gap-2">
+                  <div className="flex shrink-0 justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => void copySummary()}
+                    >
+                      <Copy className="size-4 shrink-0" aria-hidden />
+                      {t('sketches.summaryCopy')}
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={summaryDraft}
+                    onChange={(e) => setSummaryDraft(e.target.value)}
+                    onBlur={() => void persistSummaryIfChanged()}
+                    readOnly={activeSession !== null}
+                    placeholder={
+                      activeSession
+                        ? t('sketches.duringRecordingRight')
+                        : t('sketches.summaryTextareaPlaceholder')
+                    }
+                    aria-label={t('sketches.summaryTextareaLabel')}
+                    className="min-h-[12rem] flex-1 text-sm leading-relaxed whitespace-pre-wrap"
+                  />
+                  {!activeSession && !selectedSession.summary?.trim() && selectedChunk ? (
+                    <p className="shrink-0 text-xs text-muted-foreground">
+                      {t('sketches.summaryIntro')}
+                    </p>
+                  ) : null}
+                </div>
               )}
             </TabsContent>
             <TabsContent
