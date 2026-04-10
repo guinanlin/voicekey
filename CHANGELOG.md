@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.37](https://github.com/guinanlin/voicekey/compare/v0.2.36...v0.2.37) (2026-04-10)
+
+### Features
+
+- **settings:** add diagnostics tab with network, mic, asr, text, and archive probes ([df25a76](https://github.com/guinanlin/voicekey/commit/df25a761accdc93eb1553c4384396c64b7d0e683))
+- **sketches:** add editable summary with copy and debounced save ([1f0c271](https://github.com/guinanlin/voicekey/commit/1f0c27191f40200bcbccbf91d561ec0486de6aab))
+
 ### [0.2.36](https://github.com/guinanlin/voicekey/compare/v0.2.35...v0.2.36) (2026-04-10)
 
 ### [0.2.35](https://github.com/guinanlin/voicekey/compare/v0.2.34...v0.2.35) (2026-04-09)
