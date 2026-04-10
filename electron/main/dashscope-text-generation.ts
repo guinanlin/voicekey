@@ -3,6 +3,7 @@ import { DASHSCOPE, qwenCompatibleChatCompletionsUrl } from '../shared/constants
 import type { TextLlmConfig } from '../shared/types'
 
 const REQUEST_TIMEOUT_MS = 120_000
+const TEXT_LLM_PROBE_TIMEOUT_MS = 12_000
 
 export type TextGenMessage = {
   role: 'system' | 'user' | 'assistant'
@@ -156,5 +157,54 @@ export async function generateTextWithTextLlm(
       throw new Error(`Text LLM: ${msg}`)
     }
     throw err
+  }
+}
+
+export type TextLlmProbeCode = 'ok' | 'no_key' | 'auth' | 'endpoint' | 'network' | 'unknown'
+
+/**
+ * 轻量探测 text LLM：POST 最小 body（缺 messages），期望 400 表示端点与 Key 基本可用。
+ */
+export async function probeTextLlmConnection(config: TextLlmConfig): Promise<{
+  ok: boolean
+  code: TextLlmProbeCode
+  detail?: string
+}> {
+  const apiKey = config.apiKey?.trim()
+  if (!apiKey) return { ok: false, code: 'no_key' }
+
+  const url = resolveTextLlmRequestUrl(config)
+  const model = config.model?.trim() || DASHSCOPE.TEXT_LLM_DEFAULT_MODEL
+  const body = { model }
+
+  try {
+    const res = await axios.post(url, body, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: TEXT_LLM_PROBE_TIMEOUT_MS,
+      validateStatus: () => true,
+    })
+    if (res.status === 401 || res.status === 403) return { ok: false, code: 'auth' }
+    if (res.status === 400 || res.status === 200) return { ok: true, code: 'ok' }
+    const msg = formatDashScopeHttpError(res.status, res.data)
+    return { ok: false, code: 'endpoint', detail: msg }
+  } catch (err) {
+    if (axios.isAxiosError(err)) {
+      if (err.code === 'ECONNABORTED') return { ok: false, code: 'network' }
+      if (err.response?.status === 400 || err.response?.status === 200) {
+        return { ok: true, code: 'ok' }
+      }
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        return { ok: false, code: 'auth' }
+      }
+      if (err.response) {
+        const msg = formatDashScopeHttpError(err.response.status, err.response.data)
+        return { ok: false, code: 'endpoint', detail: msg }
+      }
+      return { ok: false, code: 'network', detail: err.message }
+    }
+    return { ok: false, code: 'unknown', detail: String(err) }
   }
 }

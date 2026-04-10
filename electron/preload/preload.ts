@@ -8,6 +8,7 @@ import {
   UpdateInfo,
   FlashSessionWithChunks,
   FlashGenerateSummaryResult,
+  DiagnosticsRunResult,
   SessionStartPayload,
 } from '../shared/types'
 
@@ -25,6 +26,7 @@ export interface ElectronAPI {
   getConfig: () => Promise<AppConfig>
   setConfig: (config: Partial<AppConfig>) => Promise<void>
   testConnection: (config?: ASRConfig) => Promise<boolean>
+  runDiagnostics: () => Promise<DiagnosticsRunResult>
 
   // 录音会话相关
   startSession: () => Promise<void>
@@ -105,6 +107,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getConfig: () => ipcRenderer.invoke(IPC_CHANNELS.CONFIG_GET),
   setConfig: (config: Partial<AppConfig>) => ipcRenderer.invoke(IPC_CHANNELS.CONFIG_SET, config),
   testConnection: (config?: ASRConfig) => ipcRenderer.invoke(IPC_CHANNELS.CONFIG_TEST, config),
+  runDiagnostics: () => ipcRenderer.invoke(IPC_CHANNELS.DIAGNOSTICS_RUN),
 
   // 录音会话相关
   startSession: () => ipcRenderer.invoke(IPC_CHANNELS.SESSION_START),

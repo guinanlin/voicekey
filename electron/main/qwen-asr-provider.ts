@@ -128,8 +128,20 @@ export async function transcribeQwenFromFileUrl(
  * 探测 DashScope 同步接口是否可达且 Key 有效：故意省略必填字段，期望 400（非 401/403）。
  */
 export async function testQwenDashScopeConnection(config: ASRConfig): Promise<boolean> {
+  const r = await probeQwenDashScopeAsr(config)
+  return r.ok
+}
+
+export type QwenAsrProbeCode = 'ok' | 'no_key' | 'auth' | 'endpoint' | 'network' | 'unknown'
+
+/** 设置页诊断：返回结构化结果（故意省略必填字段，期望 400/200，非 401/403） */
+export async function probeQwenDashScopeAsr(config: ASRConfig): Promise<{
+  ok: boolean
+  code: QwenAsrProbeCode
+  detail?: string
+}> {
   const apiKey = config.qwenApiKey?.trim()
-  if (!apiKey) return false
+  if (!apiKey) return { ok: false, code: 'no_key' }
 
   const url = resolveQwenMultimodalUrl(config)
   const model = qwenShortAsrModelName(config.qwenRegion, config.qwenCnIntlFlashModel)
@@ -147,11 +159,31 @@ export async function testQwenDashScopeConnection(config: ASRConfig): Promise<bo
         validateStatus: () => true,
       },
     )
-    if (res.status === 401 || res.status === 403) return false
-    if (res.status === 400) return true
-    if (res.status === 200) return true
-    return false
-  } catch {
-    return false
+    if (res.status === 401 || res.status === 403) return { ok: false, code: 'auth' }
+    if (res.status === 400 || res.status === 200) return { ok: true, code: 'ok' }
+    return {
+      ok: false,
+      code: 'endpoint',
+      detail: `HTTP ${res.status}`,
+    }
+  } catch (err) {
+    if (axios.isAxiosError(err)) {
+      if (err.code === 'ECONNABORTED') return { ok: false, code: 'network' }
+      if (err.response?.status === 400 || err.response?.status === 200) {
+        return { ok: true, code: 'ok' }
+      }
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        return { ok: false, code: 'auth' }
+      }
+      if (err.response) {
+        return {
+          ok: false,
+          code: 'endpoint',
+          detail: `HTTP ${err.response.status}`,
+        }
+      }
+      return { ok: false, code: 'network', detail: err.message }
+    }
+    return { ok: false, code: 'unknown', detail: String(err) }
   }
 }

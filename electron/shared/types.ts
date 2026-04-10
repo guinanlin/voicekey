@@ -194,12 +194,32 @@ export interface UpdateInfo {
   }
 }
 
+/** 设置页「诊断」分项 id（麦克风由渲染进程检测后合并） */
+export type DiagnosticItemId = 'network' | 'microphone' | 'asr' | 'textLlm' | 'erpnextUpload'
+
+export type DiagnosticItemStatus = 'ok' | 'fail' | 'skip'
+
+export interface DiagnosticItem {
+  id: DiagnosticItemId
+  status: DiagnosticItemStatus
+  /** 相对 `settings.` 的 i18n 后缀，如 `diagnostics.network.ok` */
+  messageKey?: string
+  messageParams?: Record<string, string>
+}
+
+/** 主进程 `DIAGNOSTICS_RUN` 返回（不含 microphone，由 UI 合并） */
+export interface DiagnosticsRunResult {
+  ranAt: string
+  items: DiagnosticItem[]
+}
+
 // IPC 通道定义
 export const IPC_CHANNELS = {
   // 配置相关
   CONFIG_GET: 'config:get',
   CONFIG_SET: 'config:set',
   CONFIG_TEST: 'config:test',
+  DIAGNOSTICS_RUN: 'diagnostics:run',
 
   // 录音会话相关
   SESSION_START: 'session:start',

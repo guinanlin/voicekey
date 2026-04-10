@@ -34,6 +34,7 @@ import {
   uploadErpnextcnDtyMp3,
 } from './erpnextcn-upload'
 import { generateTextWithTextLlm } from './dashscope-text-generation'
+import { runMainProcessDiagnostics } from './diagnostics'
 import { testQwenDashScopeConnection, transcribeQwenFromFileUrl } from './qwen-asr-provider'
 import { historyManager } from './history-manager'
 import { hotkeyManager } from './hotkey-manager'
@@ -44,6 +45,7 @@ import { UpdaterManager } from './updater-manager'
 import { startHttpServer, stopHttpServer } from './http-server'
 import {
   ASRConfig,
+  DiagnosticsRunResult,
   FlashChunkStatus,
   FlashGenerateSummaryPayload,
   FlashGenerateSummaryResult,
@@ -1382,6 +1384,14 @@ function setupIPCHandlers() {
       return false
     }
     return await asrProvider.testConnection()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.DIAGNOSTICS_RUN, async (): Promise<DiagnosticsRunResult> => {
+    return await runMainProcessDiagnostics(
+      configManager.getASRConfig(),
+      configManager.getTextLlmConfig(),
+      configManager.getErpnextcnDtyFromStore(),
+    )
   })
 
   // 会话相关

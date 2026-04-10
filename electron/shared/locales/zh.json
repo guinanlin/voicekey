@@ -193,6 +193,66 @@
     "languageAuto": "自动检测",
     "testConnection": "测试连接",
     "testingConnection": "测试中...",
+    "diagnostics": {
+      "tab": "诊断",
+      "intro": "检测网络、麦克风、语音识别与文本模型等常见条件。结果仅反映当前瞬时状态；若失败请到大模型或存储页核对 Key 与地址。",
+      "runAll": "运行全部诊断",
+      "running": "正在诊断…",
+      "lastRun": "上次检测：{{time}}",
+      "neverRun": "尚未运行",
+      "items": {
+        "network": "网络连通",
+        "microphone": "麦克风",
+        "asr": "语音识别",
+        "textLlm": "文本模型",
+        "erpnextUpload": "归档服务"
+      },
+      "status": {
+        "ok": "通过",
+        "fail": "失败",
+        "skip": "跳过"
+      },
+      "network": {
+        "ok": "可访问公网（DashScope 入口）",
+        "timeout": "连接超时，请检查网络、代理或防火墙",
+        "unreachable": "无法连接外网，请检查 DNS 与网络",
+        "unknown": "网络检测异常：{{detail}}"
+      },
+      "mic": {
+        "ok": "已获取麦克风权限并可打开音频输入",
+        "denied": "麦克风权限被拒绝，请在系统或浏览器设置中允许",
+        "notFound": "未检测到音频输入设备",
+        "notReadable": "麦克风被占用或不可用：{{detail}}",
+        "unknown": "麦克风检测失败：{{detail}}",
+        "insecure": "当前环境无法使用媒体设备"
+      },
+      "asr": {
+        "ok": "语音识别接口可达且 Key 有效",
+        "skipGlm": "当前未选择 GLM，此项跳过",
+        "skipQwen": "当前未选择千问，此项跳过",
+        "noKeyGlm": "请填写 GLM API Key（大模型页）",
+        "noKeyQwen": "请填写 DashScope API Key（大模型页）",
+        "auth": "认证失败，请检查 API Key 与地域",
+        "endpoint": "接口不可达或返回异常，请检查自定义地址",
+        "network": "请求失败，请检查网络",
+        "unknown": "检测异常：{{detail}}"
+      },
+      "textLlm": {
+        "ok": "文本模型接口可达且 Key 有效",
+        "noKey": "请填写文本模型 API Key（大模型页）",
+        "auth": "认证失败，请检查 Key 与地域/接口地址",
+        "endpoint": "接口与模型可能不匹配或地址错误",
+        "network": "请求失败，请检查网络",
+        "unknown": "检测异常：{{detail}}"
+      },
+      "erpnext": {
+        "ok": "归档服务地址可达",
+        "skip": "未配置归档 Host，闪记/千问链路的该项跳过",
+        "noKey": "已填写 Host 但未填 API Key",
+        "unreachable": "无法连接归档服务，请检查 Host 与网络",
+        "unknown": "检测异常：{{detail}}"
+      }
+    },
     "saveConfig": "保存设置",
     "savingConfig": "保存中...",
     "result": {

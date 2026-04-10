@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, XCircle, AlertTriangle, Eye, EyeOff } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, CheckCircle2, Eye, EyeOff, Loader2, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   AUDIO_CAPTURE_OPUS_BITRATE_OPTIONS,
@@ -10,8 +10,13 @@ import {
   qwenShortAsrModelName,
   qwenCompatibleChatCompletionsUrl,
 } from '@electron/shared/constants'
-import { resolveLanguage, type LanguageSetting } from '@electron/shared/i18n'
-import type { AppConfig, QwenCnIntlFlashModelId, UpdateInfo } from '@electron/shared/types'
+import { getLocale, resolveLanguage, type LanguageSetting } from '@electron/shared/i18n'
+import type {
+  AppConfig,
+  DiagnosticItem,
+  QwenCnIntlFlashModelId,
+  UpdateInfo,
+} from '@electron/shared/types'
 import { HotkeySettings } from '@/components/HotkeySettings'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -27,9 +32,45 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { toast } from 'sonner'
+
+async function probeMicrophoneForDiagnostics(): Promise<DiagnosticItem> {
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+    return { id: 'microphone', status: 'fail', messageKey: 'diagnostics.mic.insecure' }
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    stream.getTracks().forEach((tr) => tr.stop())
+    return { id: 'microphone', status: 'ok', messageKey: 'diagnostics.mic.ok' }
+  } catch (e) {
+    const err = e as DOMException
+    const name = err?.name ?? ''
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+      return { id: 'microphone', status: 'fail', messageKey: 'diagnostics.mic.denied' }
+    }
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+      return { id: 'microphone', status: 'fail', messageKey: 'diagnostics.mic.notFound' }
+    }
+    if (name === 'NotReadableError' || name === 'TrackStartError') {
+      return {
+        id: 'microphone',
+        status: 'fail',
+        messageKey: 'diagnostics.mic.notReadable',
+        messageParams: { detail: err.message || name },
+      }
+    }
+    return {
+      id: 'microphone',
+      status: 'fail',
+      messageKey: 'diagnostics.mic.unknown',
+      messageParams: { detail: err.message || String(e) },
+    }
+  }
+}
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation()
+  const diagnosticsLocale = getLocale(i18n.language)
   const [config, setConfig] = useState<AppConfig>({
     app: {
       language: 'system',
@@ -77,6 +118,9 @@ export default function SettingsPage() {
   const [showErpnextcnKey, setShowErpnextcnKey] = useState(false)
   const [showQwenApiKey, setShowQwenApiKey] = useState(false)
   const [showTextLlmApiKey, setShowTextLlmApiKey] = useState(false)
+  const [diagnosticItems, setDiagnosticItems] = useState<DiagnosticItem[]>([])
+  const [diagnosticRunning, setDiagnosticRunning] = useState(false)
+  const [diagnosticLastRun, setDiagnosticLastRun] = useState<string | null>(null)
   const hasLoadedConfig = useRef(false)
   const hasLoadedUpdateStatus = useRef(false)
 
@@ -193,6 +237,27 @@ export default function SettingsPage() {
       setTesting(false)
     }
   }
+
+  const handleRunDiagnostics = useCallback(async () => {
+    if (!window.electronAPI?.runDiagnostics) {
+      toast.error(t('common.unknownError'))
+      return
+    }
+    setDiagnosticRunning(true)
+    try {
+      const main = await window.electronAPI.runDiagnostics()
+      const mic = await probeMicrophoneForDiagnostics()
+      const network = main.items.find((i) => i.id === 'network')
+      const rest = main.items.filter((i) => i.id !== 'network')
+      setDiagnosticItems([...(network ? [network] : []), mic, ...rest])
+      setDiagnosticLastRun(main.ranAt)
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : t('common.unknownError')
+      toast.error(msg)
+    } finally {
+      setDiagnosticRunning(false)
+    }
+  }, [t])
 
   // Helper to update API Key for current region
   const handleApiKeyChange = (value: string) => {
@@ -461,6 +526,12 @@ export default function SettingsPage() {
               className="h-8 flex-none px-3 py-1.5 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
             >
               {t('hotkey.title')}
+            </TabsTrigger>
+            <TabsTrigger
+              value="diagnostics"
+              className="h-8 flex-none px-3 py-1.5 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              {t('settings.diagnostics.tab')}
             </TabsTrigger>
             <TabsTrigger
               value="about"
@@ -1192,6 +1263,93 @@ export default function SettingsPage() {
 
         <TabsContent value="hotkeys" className="mt-4 space-y-6">
           <HotkeySettings />
+        </TabsContent>
+
+        <TabsContent value="diagnostics" className="mt-4 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl font-bold">{t('settings.diagnostics.tab')}</CardTitle>
+              <p className="text-sm text-muted-foreground">{t('settings.diagnostics.intro')}</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  className="cursor-pointer no-drag"
+                  onClick={() => void handleRunDiagnostics()}
+                  disabled={diagnosticRunning}
+                >
+                  {diagnosticRunning ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                      {t('settings.diagnostics.running')}
+                    </>
+                  ) : (
+                    t('settings.diagnostics.runAll')
+                  )}
+                </Button>
+                <p className="text-sm text-muted-foreground">
+                  {diagnosticLastRun
+                    ? t('settings.diagnostics.lastRun', {
+                        time: new Intl.DateTimeFormat(diagnosticsLocale, {
+                          dateStyle: 'short',
+                          timeStyle: 'medium',
+                        }).format(new Date(diagnosticLastRun)),
+                      })
+                    : t('settings.diagnostics.neverRun')}
+                </p>
+              </div>
+              {diagnosticItems.length > 0 && (
+                <ul className="divide-y divide-border rounded-md border border-border">
+                  {diagnosticItems.map((item) => {
+                    const label = t(`settings.diagnostics.items.${item.id}`)
+                    const detail =
+                      typeof item.messageKey === 'string' && item.messageKey.length > 0
+                        ? t(`settings.${item.messageKey}`, item.messageParams ?? {})
+                        : ''
+                    return (
+                      <li
+                        key={item.id}
+                        className="flex flex-col gap-1 px-3 py-3 sm:flex-row sm:items-start sm:gap-4"
+                      >
+                        <div className="flex min-w-0 flex-1 items-start gap-2">
+                          {item.status === 'ok' && (
+                            <CheckCircle2
+                              className="mt-0.5 size-5 shrink-0 text-chart-2"
+                              aria-hidden
+                            />
+                          )}
+                          {item.status === 'fail' && (
+                            <XCircle
+                              className="mt-0.5 size-5 shrink-0 text-destructive"
+                              aria-hidden
+                            />
+                          )}
+                          {item.status === 'skip' && (
+                            <AlertTriangle
+                              className="mt-0.5 size-5 shrink-0 text-muted-foreground"
+                              aria-hidden
+                            />
+                          )}
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-baseline gap-2">
+                              <span className="font-medium">{label}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {t(`settings.diagnostics.status.${item.status}`)}
+                              </span>
+                            </div>
+                            {detail ? (
+                              <p className="text-sm text-muted-foreground">{detail}</p>
+                            ) : null}
+                          </div>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="about" className="mt-4 space-y-6">

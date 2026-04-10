@@ -193,6 +193,66 @@
     "languageAuto": "Auto Detect",
     "testConnection": "Test Connection",
     "testingConnection": "Testing...",
+    "diagnostics": {
+      "tab": "Diagnostics",
+      "intro": "Check network, microphone, speech and text models. Results reflect the current moment only; fix keys and URLs on the Models or Storage tab if something fails.",
+      "runAll": "Run all checks",
+      "running": "Running diagnostics…",
+      "lastRun": "Last run: {{time}}",
+      "neverRun": "Not run yet",
+      "items": {
+        "network": "Network",
+        "microphone": "Microphone",
+        "asr": "Speech recognition",
+        "textLlm": "Text model",
+        "erpnextUpload": "Archive host"
+      },
+      "status": {
+        "ok": "OK",
+        "fail": "Failed",
+        "skip": "Skipped"
+      },
+      "network": {
+        "ok": "Reachable (DashScope entry)",
+        "timeout": "Connection timed out—check network or proxy",
+        "unreachable": "Cannot reach the internet—check DNS and connectivity",
+        "unknown": "Network check error: {{detail}}"
+      },
+      "mic": {
+        "ok": "Microphone permission granted and input opens",
+        "denied": "Microphone permission denied—allow it in system or site settings",
+        "notFound": "No audio input device found",
+        "notReadable": "Microphone busy or unavailable: {{detail}}",
+        "unknown": "Microphone check failed: {{detail}}",
+        "insecure": "Media devices are not available in this context"
+      },
+      "asr": {
+        "ok": "Speech API reachable and key accepted",
+        "skipGlm": "GLM is not selected—skipped",
+        "skipQwen": "Qwen is not selected—skipped",
+        "noKeyGlm": "Enter GLM API Key (Models tab)",
+        "noKeyQwen": "Enter DashScope API Key (Models tab)",
+        "auth": "Authentication failed—check API key and region",
+        "endpoint": "Endpoint unreachable or invalid response—check custom URL",
+        "network": "Request failed—check network",
+        "unknown": "Check error: {{detail}}"
+      },
+      "textLlm": {
+        "ok": "Text API reachable and key accepted",
+        "noKey": "Enter text model API Key (Models tab)",
+        "auth": "Authentication failed—check key, region and URL",
+        "endpoint": "Endpoint/model mismatch or bad URL",
+        "network": "Request failed—check network",
+        "unknown": "Check error: {{detail}}"
+      },
+      "erpnext": {
+        "ok": "Archive host reachable",
+        "skip": "Archive host not configured—skipped for this path",
+        "noKey": "Host set but API Key is empty",
+        "unreachable": "Cannot reach archive host—check URL and network",
+        "unknown": "Check error: {{detail}}"
+      }
+    },
     "saveConfig": "Save Settings",
     "savingConfig": "Saving...",
     "result": {
