@@ -1372,7 +1372,12 @@ export default function SettingsPage() {
                     <p className="text-sm text-muted-foreground">{t('settings.noUpdate')}</p>
                   )}
                   {updateInfo?.error && (
-                    <p className="text-sm text-destructive">{t('settings.updateError')}</p>
+                    <div className="space-y-1">
+                      <p className="text-sm text-destructive">{t('settings.updateError')}</p>
+                      <p className="text-xs text-destructive/90 break-all font-mono">
+                        {updateInfo.error}
+                      </p>
+                    </div>
                   )}
                   {updateInfo?.status === 'downloading' && updateInfo.downloadProgress && (
                     <div className="space-y-1">

@@ -116,11 +116,14 @@ export class UpdaterManager {
   }
 
   private static updateLastInfo(partial: Partial<UpdateInfo>) {
-    if (UpdaterManager.lastUpdateInfo) {
-      UpdaterManager.lastUpdateInfo = {
-        ...UpdaterManager.lastUpdateInfo,
-        ...partial,
-      }
+    UpdaterManager.lastUpdateInfo = {
+      hasUpdate: false,
+      latestVersion: '',
+      releaseUrl: UpdaterManager.getDefaultReleaseUrl(),
+      releaseNotes: '',
+      status: 'checking',
+      ...(UpdaterManager.lastUpdateInfo ?? {}),
+      ...partial,
     }
   }
 
@@ -180,49 +183,118 @@ export class UpdaterManager {
       return await UpdaterManager.checkForUpdatesViaAPI()
     }
 
-    try {
-      console.log('[Updater] Checking for updates using electron-updater...')
-      console.log('[Updater] Current version:', app.getVersion())
+    console.log('[Updater] Checking for updates using electron-updater...')
+    console.log('[Updater] Current version:', app.getVersion())
 
-      // 打包版本必须使用 electron-updater 事件链，不再回退到 GitHub API
-      await autoUpdater.checkForUpdates()
+    const CHECK_TIMEOUT_MS = 30_000
 
-      // 等待一小段时间，让事件处理器有机会更新 lastUpdateInfo
-      await new Promise((resolve) => setTimeout(resolve, 500))
+    return new Promise((resolve) => {
+      let completed = false
 
-      // 返回当前状态
-      if (UpdaterManager.lastUpdateInfo) {
-        console.log('[Updater] Update info from event:', UpdaterManager.lastUpdateInfo)
-        return UpdaterManager.lastUpdateInfo
+      const finish = (info: UpdateInfo) => {
+        if (completed) return
+        completed = true
+        cleanup()
+        console.log('[Updater] Update check finished:', info.status, info.hasUpdate, info.error)
+        resolve(info)
       }
 
-      // 异常情况：未收到事件，按错误处理
-      const info: UpdateInfo = {
-        hasUpdate: false,
-        latestVersion: '',
-        releaseUrl: UpdaterManager.getDefaultReleaseUrl(),
-        releaseNotes: '',
-        error: 'No update event received from electron-updater',
-        status: 'error',
+      const cleanup = () => {
+        clearTimeout(timer)
+        autoUpdater.removeListener('update-available', onAvailable)
+        autoUpdater.removeListener('update-not-available', onNotAvailable)
+        autoUpdater.removeListener('error', onError)
       }
-      UpdaterManager.lastUpdateInfo = info
-      return info
-    } catch (error) {
-      console.error('[Updater] electron-updater failed:', error)
-      const info: UpdateInfo = {
-        hasUpdate: false,
-        latestVersion: '',
-        releaseUrl: UpdaterManager.getDefaultReleaseUrl(),
-        releaseNotes: '',
-        error:
-          error instanceof Error
-            ? `electron-updater check failed: ${error.message}`
-            : 'electron-updater check failed',
-        status: 'error',
+
+      const timer = setTimeout(() => {
+        const info: UpdateInfo = {
+          hasUpdate: false,
+          latestVersion: '',
+          releaseUrl: UpdaterManager.getDefaultReleaseUrl(),
+          releaseNotes: '',
+          error: `Update check timed out (${CHECK_TIMEOUT_MS / 1000}s)`,
+          status: 'error',
+        }
+        UpdaterManager.lastUpdateInfo = info
+        finish(info)
+      }, CHECK_TIMEOUT_MS)
+
+      const onAvailable = () => {
+        const info = UpdaterManager.lastUpdateInfo
+        if (info) {
+          console.log('[Updater] Update info from event:', info)
+          finish(info)
+        } else {
+          const fallback: UpdateInfo = {
+            hasUpdate: true,
+            latestVersion: '',
+            releaseUrl: UpdaterManager.getDefaultReleaseUrl(),
+            releaseNotes: '',
+            error: 'update-available fired but lastUpdateInfo was empty',
+            status: 'error',
+          }
+          UpdaterManager.lastUpdateInfo = fallback
+          finish(fallback)
+        }
       }
-      UpdaterManager.lastUpdateInfo = info
-      return info
-    }
+
+      const onNotAvailable = () => {
+        const info = UpdaterManager.lastUpdateInfo
+        if (info) {
+          console.log('[Updater] Update info from event:', info)
+          finish(info)
+        } else {
+          const fallback: UpdateInfo = {
+            hasUpdate: false,
+            latestVersion: app.getVersion(),
+            releaseUrl: UpdaterManager.getDefaultReleaseUrl(),
+            releaseNotes: '',
+            status: 'not-available',
+          }
+          UpdaterManager.lastUpdateInfo = fallback
+          finish(fallback)
+        }
+      }
+
+      const onError = () => {
+        const info = UpdaterManager.lastUpdateInfo
+        if (info?.status === 'error') {
+          finish(info)
+        } else {
+          const fallback: UpdateInfo = {
+            hasUpdate: false,
+            latestVersion: '',
+            releaseUrl: UpdaterManager.getDefaultReleaseUrl(),
+            releaseNotes: '',
+            error: 'Updater error event without message',
+            status: 'error',
+          }
+          UpdaterManager.lastUpdateInfo = fallback
+          finish(fallback)
+        }
+      }
+
+      autoUpdater.once('update-available', onAvailable)
+      autoUpdater.once('update-not-available', onNotAvailable)
+      autoUpdater.once('error', onError)
+
+      void autoUpdater.checkForUpdates().catch((error: unknown) => {
+        console.error('[Updater] electron-updater checkForUpdates() rejected:', error)
+        const info: UpdateInfo = {
+          hasUpdate: false,
+          latestVersion: '',
+          releaseUrl: UpdaterManager.getDefaultReleaseUrl(),
+          releaseNotes: '',
+          error:
+            error instanceof Error
+              ? `electron-updater check failed: ${error.message}`
+              : 'electron-updater check failed',
+          status: 'error',
+        }
+        UpdaterManager.lastUpdateInfo = info
+        finish(info)
+      })
+    })
   }
 
   // 备用方法：通过 GitHub API 检查更新
