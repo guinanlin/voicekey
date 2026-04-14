@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.38](https://github.com/guinanlin/voicekey/compare/v0.2.37...v0.2.38) (2026-04-14)
+
+### Bug Fixes
+
+- **updater:** wait for events with timeout and show error detail ([e5c8710](https://github.com/guinanlin/voicekey/commit/e5c871069e98a5805c758acbf2e4f664aed3a13f))
+
 ### [0.2.37](https://github.com/guinanlin/voicekey/compare/v0.2.36...v0.2.37) (2026-04-10)
 
 ### Features
