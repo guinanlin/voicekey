@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Server, CheckCircle2, AlertCircle, XCircle } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 interface ServiceStatus {
   status: 'ready' | 'warning' | 'error' | 'disabled'
@@ -107,20 +114,6 @@ export default function ServiceStatusCard() {
     }
   }
 
-  const getStatusBadgeVariant = (): 'default' | 'destructive' | 'outline' => {
-    switch (serviceStatus?.status) {
-      case 'ready':
-        return 'default'
-      case 'warning':
-        return 'outline'
-      case 'error':
-      case 'disabled':
-        return 'destructive'
-      default:
-        return 'outline'
-    }
-  }
-
   const getStatusText = () => {
     if (loading) return '检查中...'
     switch (serviceStatus?.status) {
@@ -153,25 +146,37 @@ export default function ServiceStatusCard() {
             {getStatusIcon()}
           </div>
           {qrCodeValue && (
-            <div className="bg-white p-1 rounded border flex-shrink-0">
-              <QRCodeSVG value={qrCodeValue} size={50} level="M" />
-            </div>
+            <Dialog>
+              <DialogTrigger asChild>
+                <button
+                  type="button"
+                  className="bg-white p-1 rounded border flex-shrink-0 cursor-pointer transition-shadow hover:ring-2 hover:ring-ring/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  title="点击放大二维码"
+                  aria-label="点击放大二维码"
+                >
+                  <QRCodeSVG value={qrCodeValue} size={50} level="M" />
+                </button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-sm">
+                <DialogHeader>
+                  <DialogTitle>扫描二维码</DialogTitle>
+                  <DialogDescription>使用手机扫描访问剪贴板服务</DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col items-center gap-3">
+                  <div className="bg-white p-3 rounded border">
+                    <QRCodeSVG value={qrCodeValue} size={256} level="M" />
+                  </div>
+                  <p className="text-xs font-mono text-muted-foreground break-all text-center">
+                    {qrCodeValue}
+                  </p>
+                </div>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
       </CardHeader>
       <CardContent className="pt-0 space-y-2 flex-1 flex flex-col justify-between">
         <div className="space-y-2">
-          {/* 服务状态徽章 */}
-          <div className="flex items-center gap-2">
-            <Badge variant={getStatusBadgeVariant()} className="text-[10px]">
-              {serviceStatus?.status || 'unknown'}
-            </Badge>
-            {serviceStatus?.message && (
-              <span className="text-xs text-muted-foreground">{serviceStatus.message}</span>
-            )}
-          </div>
-
-          {/* 访问地址 */}
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">本地地址:</div>
             <div className="text-xs font-mono bg-muted px-2 py-0.5 rounded break-all">

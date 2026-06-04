@@ -3,7 +3,7 @@ import { Area, AreaChart, CartesianGrid, XAxis } from 'recharts'
 import { useTranslation } from 'react-i18next'
 import { getLocale } from '@electron/shared/i18n'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   ChartContainer,
   ChartLegend,
@@ -131,7 +131,6 @@ export default function InteractiveCharts({ historyItems, loading }: Interactive
               </span>
             )}
           </CardTitle>
-          <CardDescription className="text-xs">{t('home.chart.description')}</CardDescription>
         </div>
         <Select value={timeRange} onValueChange={setTimeRange}>
           <SelectTrigger
