@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.41](https://github.com/guinanlin/voicekey/compare/v0.2.40...v0.2.41) (2026-06-05)
+
+### Features
+
+- **craftsman:** add resizable right panel and AI tool placeholders ([0ad4b96](https://github.com/guinanlin/voicekey/commit/0ad4b96357b8bfd578fbe47c0bf464d1ff0d6a98))
+
 ### [0.2.40](https://github.com/guinanlin/voicekey/compare/v0.2.39...v0.2.40) (2026-06-04)
 
 ### Features
