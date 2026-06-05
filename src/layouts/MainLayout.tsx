@@ -19,9 +19,11 @@ const SIDEBAR_COLLAPSED_KEY = 'voicekey-sidebar-collapsed'
 
 function readSidebarCollapsed(): boolean {
   try {
-    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'
+    const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
+    if (stored === null) return true
+    return stored === '1'
   } catch {
-    return false
+    return true
   }
 }
 
@@ -69,12 +71,12 @@ export default function MainLayout({ children, currentRoute }: MainLayoutProps) 
   const navItems = [
     { path: '/home', label: t('nav.home'), icon: Home },
     { path: '/sketches', label: t('nav.sketches'), icon: NotebookPen },
+    { path: '/history', label: t('nav.craftsman'), icon: History },
     { path: '/settings', label: t('nav.settings'), icon: Settings },
-    { path: '/history', label: t('nav.history'), icon: History },
   ]
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-sidebar rounded-2xl overflow-hidden">
+    <div className="flex flex-col h-screen w-screen bg-sidebar rounded-2xl overflow-hidden border border-sidebar-border">
       {/* 顶部标题栏 - 包含 logo 和标题 */}
       <div
         className={`drag-region h-8 shrink-0 bg-sidebar flex items-center justify-between ${

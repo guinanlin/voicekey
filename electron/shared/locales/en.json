@@ -4,10 +4,11 @@
     "version": "Version {{version}}"
   },
   "nav": {
-    "home": "Home",
+    "home": "Splash",
     "sketches": "Flash Notes",
-    "settings": "Settings",
-    "history": "History"
+    "settings": "Base",
+    "history": "History",
+    "craftsman": "Craftsman"
   },
   "sketches": {
     "start": "Start",
@@ -343,7 +344,19 @@
     "today": "Today",
     "yesterday": "Yesterday",
     "copyTitle": "Copy text",
-    "deleteTitle": "Delete"
+    "deleteTitle": "Delete",
+    "placeholderTitle": "Coming soon",
+    "placeholderDesc": "This panel is reserved for upcoming features.",
+    "expandRightPanel": "Expand right panel",
+    "collapseRightPanel": "Collapse right panel",
+    "tools": {
+      "polish": "Polish",
+      "summarize": "Summarize",
+      "translate": "Translate",
+      "wechat": "WeChat",
+      "twitter": "Twitter",
+      "email": "Email"
+    }
   },
   "hud": {
     "finish": "Finish",

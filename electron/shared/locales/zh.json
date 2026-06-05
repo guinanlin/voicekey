@@ -4,10 +4,11 @@
     "version": "版本 {{version}}"
   },
   "nav": {
-    "home": "首页",
+    "home": "开屏",
     "sketches": "闪记",
-    "settings": "设置",
-    "history": "历史"
+    "settings": "基地",
+    "history": "历史",
+    "craftsman": "工匠"
   },
   "sketches": {
     "start": "开始",
@@ -343,7 +344,19 @@
     "today": "今天",
     "yesterday": "昨天",
     "copyTitle": "复制文本",
-    "deleteTitle": "删除"
+    "deleteTitle": "删除",
+    "placeholderTitle": "功能开发中",
+    "placeholderDesc": "此区域预留用于后续扩展功能。",
+    "expandRightPanel": "展开右侧面板",
+    "collapseRightPanel": "收起右侧面板",
+    "tools": {
+      "polish": "润色",
+      "summarize": "总结",
+      "translate": "翻译",
+      "wechat": "微信",
+      "twitter": "推特",
+      "email": "邮件"
+    }
   },
   "hud": {
     "finish": "完成",

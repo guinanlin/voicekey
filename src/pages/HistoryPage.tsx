@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Search, Filter, Copy, Trash2 } from 'lucide-react'
+import { Search, Filter, Copy, Trash2, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
@@ -20,12 +20,103 @@ interface HistoryItem {
   duration?: number
 }
 
+const DISPLAY_LIMIT = 10
+
+const HISTORY_ITEM_TOOLS = [
+  { id: 'polish', labelKey: 'history.tools.polish' },
+  { id: 'summarize', labelKey: 'history.tools.summarize' },
+  { id: 'translate', labelKey: 'history.tools.translate' },
+  { id: 'wechat', labelKey: 'history.tools.wechat' },
+  { id: 'twitter', labelKey: 'history.tools.twitter' },
+  { id: 'email', labelKey: 'history.tools.email' },
+] as const
+const RIGHT_PANEL_KEY = 'voicekey-craftsman-right-panel'
+const SPLIT_RATIO_KEY = 'voicekey-craftsman-split-ratio'
+const MIN_PANEL_RATIO = 0.25
+const MAX_PANEL_RATIO = 0.75
+const DEFAULT_SPLIT_RATIO = 0.5
+
+function readRightPanelOpen(): boolean {
+  try {
+    return localStorage.getItem(RIGHT_PANEL_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function readSplitRatio(): number {
+  try {
+    const raw = localStorage.getItem(SPLIT_RATIO_KEY)
+    if (raw === null) return DEFAULT_SPLIT_RATIO
+    const n = Number.parseFloat(raw)
+    if (!Number.isFinite(n)) return DEFAULT_SPLIT_RATIO
+    return Math.min(MAX_PANEL_RATIO, Math.max(MIN_PANEL_RATIO, n))
+  } catch {
+    return DEFAULT_SPLIT_RATIO
+  }
+}
+
 export default function HistoryPage() {
   const { t, i18n } = useTranslation()
   const [searchQuery, setSearchQuery] = React.useState('')
   const [sortOrder, setSortOrder] = React.useState<'newest' | 'oldest'>('newest')
   const [items, setItems] = React.useState<HistoryItem[]>([])
   const [loading, setLoading] = React.useState(true)
+  const [rightPanelOpen, setRightPanelOpen] = React.useState(readRightPanelOpen)
+  const [leftRatio, setLeftRatio] = React.useState(readSplitRatio)
+  const containerRef = React.useRef<HTMLDivElement>(null)
+  const draggingRef = React.useRef(false)
+  const leftRatioRef = React.useRef(leftRatio)
+
+  React.useEffect(() => {
+    leftRatioRef.current = leftRatio
+  }, [leftRatio])
+
+  const toggleRightPanel = React.useCallback(() => {
+    setRightPanelOpen((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem(RIGHT_PANEL_KEY, next ? '1' : '0')
+      } catch {
+        /* ignore quota / private mode */
+      }
+      return next
+    })
+  }, [])
+
+  const beginResize = React.useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    draggingRef.current = true
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [])
+
+  React.useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingRef.current || !containerRef.current) return
+      const { left, width } = containerRef.current.getBoundingClientRect()
+      if (width <= 0) return
+      const ratio = (e.clientX - left) / width
+      setLeftRatio(Math.min(MAX_PANEL_RATIO, Math.max(MIN_PANEL_RATIO, ratio)))
+    }
+    const onUp = () => {
+      if (!draggingRef.current) return
+      draggingRef.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      try {
+        localStorage.setItem(SPLIT_RATIO_KEY, String(leftRatioRef.current))
+      } catch {
+        /* ignore quota / private mode */
+      }
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [])
 
   const locale = getLocale(i18n.language)
   const numberFormatter = React.useMemo(() => new Intl.NumberFormat(locale), [locale])
@@ -99,12 +190,13 @@ export default function HistoryPage() {
       item.text.toLowerCase().includes(searchQuery.toLowerCase()),
     )
 
-    return filtered.sort((a, b) => {
+    const sorted = filtered.sort((a, b) => {
       if (sortOrder === 'newest') {
         return b.timestamp - a.timestamp
       }
       return a.timestamp - b.timestamp
     })
+    return sorted.slice(0, DISPLAY_LIMIT)
   }, [items, searchQuery, sortOrder])
 
   const groupedItems = React.useMemo(() => {
@@ -155,16 +247,12 @@ export default function HistoryPage() {
     }
   }, [t])
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center py-4">
-        <p className="text-muted-foreground">{t('history.loading')}</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex max-w-4xl flex-col h-full -mb-6">
+  const historyPanel = loading ? (
+    <div className="flex h-64 items-center justify-center py-4">
+      <p className="text-muted-foreground">{t('history.loading')}</p>
+    </div>
+  ) : (
+    <>
       <div className="mb-2 flex shrink-0 items-center justify-between gap-4 py-4">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="relative flex-1 max-w-xs group/search">
@@ -199,7 +287,7 @@ export default function HistoryPage() {
             </Button>
           )}
         </div>
-        <div className="text-sm text-muted-foreground whitespace-nowrap">
+        <div className="flex items-center gap-0.5 text-sm text-muted-foreground whitespace-nowrap">
           {items.length > 0 ? (
             <span>
               {formatNumber(items.length)}
@@ -208,6 +296,24 @@ export default function HistoryPage() {
           ) : (
             <span>{t('history.empty')}</span>
           )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            onClick={toggleRightPanel}
+            title={rightPanelOpen ? t('history.collapseRightPanel') : t('history.expandRightPanel')}
+            aria-expanded={rightPanelOpen}
+            aria-label={
+              rightPanelOpen ? t('history.collapseRightPanel') : t('history.expandRightPanel')
+            }
+          >
+            {rightPanelOpen ? (
+              <PanelRightClose className="h-3.5 w-3.5" aria-hidden />
+            ) : (
+              <PanelRightOpen className="h-3.5 w-3.5" aria-hidden />
+            )}
+          </Button>
         </div>
       </div>
 
@@ -235,15 +341,15 @@ export default function HistoryPage() {
                   {groupItems.map((item) => (
                     <div
                       key={item.id}
-                      className="group relative flex items-start gap-3 px-2 py-2 hover:bg-secondary/30 transition-colors"
+                      className="group relative flex flex-col gap-1.5 px-2 py-2 hover:bg-secondary/30 transition-colors"
                     >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-foreground leading-relaxed line-clamp-3 selection:bg-primary/20">
-                          {item.text}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
+                      <p className="text-sm text-foreground leading-relaxed line-clamp-3 selection:bg-primary/20">
+                        {item.text}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
                           <span className="tabular-nums">{formatTime(item.timestamp)}</span>
-                          {item.duration && (
+                          {item.duration ? (
                             <>
                               <span className="text-muted-foreground/40">·</span>
                               <span>
@@ -253,29 +359,42 @@ export default function HistoryPage() {
                                 })}
                               </span>
                             </>
-                          )}
+                          ) : null}
                         </div>
-                      </div>
-
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                          onClick={() => copyToClipboard(item.text)}
-                          title={t('history.copyTitle')}
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => deleteItem(item.id)}
-                          title={t('history.deleteTitle')}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex min-w-0 flex-1 items-center justify-center gap-0.5 overflow-x-auto opacity-0 transition-opacity group-hover:opacity-100">
+                          {HISTORY_ITEM_TOOLS.map((tool) => (
+                            <Button
+                              key={tool.id}
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 shrink-0 px-1.5 text-[11px] font-normal text-muted-foreground hover:text-foreground"
+                              title={t(tool.labelKey)}
+                            >
+                              {t(tool.labelKey)}
+                            </Button>
+                          ))}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                            onClick={() => copyToClipboard(item.text)}
+                            title={t('history.copyTitle')}
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => deleteItem(item.id)}
+                            title={t('history.deleteTitle')}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -285,6 +404,46 @@ export default function HistoryPage() {
           </div>
         )}
       </div>
+    </>
+  )
+
+  const rightRatio = 1 - leftRatio
+
+  return (
+    <div
+      ref={containerRef}
+      className="grid h-full min-h-0 -mb-6"
+      style={{
+        gridTemplateColumns: rightPanelOpen ? `${leftRatio}fr 6px ${rightRatio}fr` : '1fr',
+      }}
+    >
+      <div className="flex min-h-0 min-w-0 flex-col">{historyPanel}</div>
+      {rightPanelOpen ? (
+        <>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-valuenow={Math.round(leftRatio * 100)}
+            aria-valuemin={Math.round(MIN_PANEL_RATIO * 100)}
+            aria-valuemax={Math.round(MAX_PANEL_RATIO * 100)}
+            className="group relative flex cursor-col-resize items-stretch justify-center"
+            onMouseDown={beginResize}
+          >
+            <div className="absolute inset-y-0 -left-1.5 -right-1.5" aria-hidden />
+            <div className="w-px bg-border/50 transition-colors group-hover:bg-border group-active:bg-primary/50" />
+          </div>
+          <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border/40 bg-secondary/10">
+            <div className="flex flex-1 flex-col items-center justify-center px-6 py-20 text-center text-muted-foreground">
+              <p className="text-sm font-medium text-foreground/70">
+                {t('history.placeholderTitle')}
+              </p>
+              <p className="mt-2 max-w-xs text-xs text-muted-foreground/60">
+                {t('history.placeholderDesc')}
+              </p>
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }
