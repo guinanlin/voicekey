@@ -277,7 +277,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-artifacts
-          path: release/**/Voice*-Linux-*.deb
+          path: |
+            release/**/Voice*-Linux-*.deb
+            release/**/latest-linux.yml
           if-no-files-found: error
 
   # 5. 发布 Release（mac/win 逻辑不变，仅增加 linux 下载与附件）
@@ -316,6 +318,7 @@ jobs:
             artifacts/**/Voice*-Linux-*.deb
             artifacts/**/latest.yml
             artifacts/**/latest-mac.yml
+            artifacts/**/latest-linux.yml
             artifacts/**/*.blockmap
           body: |
             ## 🎉 新版本发布！
