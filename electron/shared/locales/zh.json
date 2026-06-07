@@ -146,15 +146,30 @@
     "asrBackendGlm": "GLM ASR（智谱）",
     "asrBackendQwen": "千问 Qwen3 ASR Flash（DashScope）",
     "textLlmTitle": "文本识别模型",
-    "textLlmHint": "用于闪记总结：留空地址时走 compatible-mode；若填写 …/text-generation/generation，请使用纯文本模型（如 qwen-plus），勿与 qwen3.5-flash 混用（会报 url error）。与「语音识别」独立，地域须与 API Key 一致。",
+    "textLlmHint": "用于闪记总结，与「语音识别」独立配置。",
+    "textLlmProviderLabel": "渠道",
+    "textLlmProviderAliyun": "阿里云（DashScope）",
+    "textLlmProviderCtyun": "天翼云（Wishub）",
+    "textLlmProviderTip": "选择模型服务来源。阿里云走百炼 DashScope；天翼云走 Wishub OpenAI 兼容接口。",
     "textLlmModelLabel": "模型名称",
     "textLlmModelPlaceholder": "qwen-plus",
-    "textLlmModelHelp": "默认 qwen-plus（与 text-generation 示例一致）。使用 compatible-mode 时可改为 qwen3.5-flash 等，以百炼文档为准。",
-    "textLlmRegionLabel": "DashScope 区域",
+    "textLlmModelTip": "阿里云：即 API 模型名，默认 qwen-plus；compatible-mode 可换 qwen3.5-flash；legacy text-generation 地址须用纯文本模型。",
+    "textLlmModelIdLabel": "Model ID",
+    "textLlmModelIdPlaceholder": "f23c54bf38b64ee194b28783d61be788",
+    "textLlmModelIdTip": "天翼云控制台「模型 ID」，请求时作为 model 参数；与上方可读名称一一对应。",
+    "textLlmModelNamePlaceholderCtyun": "DeepSeek V4 Flash",
+    "textLlmModelNameTipCtyun": "便于识别实际模型，仅本地展示，不发送给 API。",
+    "textLlmRegionLabel": "区域",
+    "textLlmRegionTipAliyun": "须与 API Key 地域一致：北京 / 新加坡 / 美国。",
+    "textLlmRegionTipCtyun": "Wishub 集群节点。留空接口地址时按所选节点生成默认 URL；实例专属地址请在下方填写。",
     "textLlmEndpointLabel": "文本生成接口地址",
-    "textLlmEndpointHelp": "留空则使用官方 compatible-mode chat/completions 地址。若需旧版 DashScope 文本生成，可填写含 …/text-generation/generation 的完整 URL。",
-    "textLlmApiKey": "API Key（DashScope）",
-    "textLlmApiKeyHelp": "获取 API Key",
+    "textLlmEndpointTipAliyun": "留空走 compatible-mode chat/completions。旧版 DashScope 可填 …/text-generation/generation 完整 URL。",
+    "textLlmEndpointTipCtyun": "留空按区域使用 wishub-x*.ctyun.cn/v1/chat/completions。训推实例专属 URL 可填服务详情页完整地址。",
+    "textLlmApiKey": "API Key",
+    "textLlmApiKeyTipAliyun": "DashScope API Key，地域须与上方区域一致。",
+    "textLlmApiKeyTipCtyun": "天翼云 AppKey / Bearer Token，从控制台 Token 服务获取。",
+    "textLlmApiKeyLinkAliyun": "获取 DashScope Key",
+    "textLlmApiKeyLinkCtyun": "天翼云快速入门",
     "glmAsrCardTitle": "GLM ASR",
     "qwenAsrCardTitle": "千问 Qwen3 ASR Flash",
     "qwenAsrHint": "千问使用 DashScope 短音频同步识别（低延迟）。录音为 WebM（Opus），需先上传到「存储」中的 ERPNextCN 并得到公网 HTTPS 地址再转写；请配置 Host 与 API Key。单段音频须 ≤5 分钟且 ≤10MB。美国地域请使用美国百炼 API Key。",
@@ -162,6 +177,9 @@
     "qwenRegionCn": "中国大陆（北京）",
     "qwenRegionIntl": "国际（新加坡）",
     "qwenRegionUs": "美国（弗吉尼亚）",
+    "ctyunRegionX1": "Wishub X1",
+    "ctyunRegionX5": "Wishub X5",
+    "ctyunRegionX6": "Wishub X6",
     "qwenSubmitEndpoint": "同步识别接口地址",
     "qwenSubmitEndpointHelp": "留空则按当前地域使用 DashScope 官方默认地址；填写完整 URL 后优先使用该地址。",
     "qwenFlashModelLabel": "Flash 模型版本",
@@ -241,6 +259,7 @@
       "textLlm": {
         "ok": "文本模型接口可达且 Key 有效",
         "noKey": "请填写文本模型 API Key（大模型页）",
+        "noModel": "请填写天翼云 Model ID（大模型页）",
         "auth": "认证失败，请检查 Key 与地域/接口地址",
         "endpoint": "接口与模型可能不匹配或地址错误",
         "network": "请求失败，请检查网络",
@@ -254,6 +273,38 @@
         "unknown": "检测异常：{{detail}}"
       }
     },
+    "commands": {
+      "tab": "指令",
+      "intro": "说完内容后说出触发词（如「小猪佩奇总结」），将按对应 Prompt 调用文本模型处理。点击条目展开编辑 Prompt。",
+      "promptLabel": "Prompt",
+      "resetDefault": "恢复默认",
+      "items": {
+        "polish": {
+          "name": "润色",
+          "desc": "口语转自然书面表达"
+        },
+        "summary": {
+          "name": "总结",
+          "desc": "提炼核心观点与要点"
+        },
+        "translate": {
+          "name": "翻译",
+          "desc": "中英文互译"
+        },
+        "wechat": {
+          "name": "微信",
+          "desc": "商务聊天语气，适合即时通讯"
+        },
+        "twitter": {
+          "name": "推特",
+          "desc": "适合 X（Twitter）发布的推文"
+        },
+        "email": {
+          "name": "邮件",
+          "desc": "正式商务邮件格式"
+        }
+      }
+    },
     "saveConfig": "保存设置",
     "savingConfig": "保存中...",
     "result": {
@@ -262,7 +313,17 @@
       "apiKeyRequired": "请先输入 API Key",
       "qwenApiKeyRequired": "请先输入 DashScope API Key",
       "connectionSuccess": "连接成功！",
+      "connectionSuccessLlm": "语音识别与文本模型连接均正常。",
       "connectionFailed": "连接失败，请检查 API Key。",
+      "asrConnectionSuccess": "语音识别连接正常。",
+      "asrConnectionFailed": "语音识别连接失败，请检查 API Key 与接口。",
+      "textLlmConnectionSuccess": "文本模型连接正常。",
+      "textLlmApiKeyRequired": "请先填写文本模型 API Key。",
+      "textLlmModelIdRequired": "天翼云须填写 Model ID。",
+      "textLlmConnectionFailedAuth": "文本模型认证失败，请检查 API Key。",
+      "textLlmConnectionFailedEndpoint": "文本模型接口异常：{{detail}}",
+      "textLlmConnectionFailedNetwork": "文本模型网络请求失败：{{detail}}",
+      "textLlmConnectionFailed": "文本模型连接失败。",
       "testFailed": "测试失败：{{message}}"
     }
   },
@@ -347,6 +408,25 @@
     "deleteTitle": "删除",
     "placeholderTitle": "功能开发中",
     "placeholderDesc": "此区域预留用于后续扩展功能。",
+    "chat": {
+      "title": "AI 助手",
+      "activeCommand": "AI 助手 · {{command}}",
+      "emptyTitle": "开始对话",
+      "emptyDesc": "点击左侧历史的指令按钮，或输入消息与 AI 交流。",
+      "inputPlaceholder": "输入消息…",
+      "selectCommand": "请先点击左侧指令按钮开始…",
+      "send": "发送",
+      "attach": "上传附件",
+      "removeAttach": "移除附件",
+      "thinking": "思考中…",
+      "hint": "Enter 发送，Shift+Enter 换行",
+      "noApiKey": "请先在「大模型」中配置文本模型 API Key。",
+      "noCommand": "请先从左侧历史选择一条指令。",
+      "requestFailed": "AI 请求失败，请稍后重试。",
+      "emptySource": "该条记录没有可用文本。",
+      "copy": "复制回复",
+      "copySuccess": "已复制到剪贴板"
+    },
     "expandRightPanel": "展开右侧面板",
     "collapseRightPanel": "收起右侧面板",
     "tools": {
@@ -386,6 +466,8 @@
     "stopFailed": "停止录音失败",
     "generic": "错误",
     "emptyTranscription": "未识别到语音内容",
+    "commandNeedsTextLlm": "已识别指令，请先在「大模型」中配置文本模型 API Key。",
+    "commandFailed": "指令处理失败：{{message}}",
     "recordingDataMissing": "未收到有效录音数据（可能因麦克风、权限或后台窗口被节流）。请检查输入设备后重试。",
     "qwenNeedsErpnextUpload": "千问 ASR 需要先在「存储」中配置 ERPNextCN 的 API Key 并成功上传音频，以获得公网文件地址。",
     "qwenFileTooLarge": "音频超过千问短音频限制（10MB）。请缩短录音后重试。",

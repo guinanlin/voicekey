@@ -149,6 +149,9 @@ function mapTextLlmProbe(r: Awaited<ReturnType<typeof probeTextLlmConnection>>):
   if (r.code === 'no_key') {
     return { id: 'textLlm', status: 'fail', messageKey: 'diagnostics.textLlm.noKey' }
   }
+  if (r.code === 'no_model') {
+    return { id: 'textLlm', status: 'fail', messageKey: 'diagnostics.textLlm.noModel' }
+  }
   if (r.code === 'auth') {
     return { id: 'textLlm', status: 'fail', messageKey: 'diagnostics.textLlm.auth' }
   }

@@ -146,15 +146,30 @@
     "asrBackendGlm": "GLM ASR (Zhipu)",
     "asrBackendQwen": "Qwen3 ASR Flash (DashScope)",
     "textLlmTitle": "Text recognition model",
-    "textLlmHint": "Flash summaries: empty URL uses compatible-mode. If you set …/text-generation/generation, use a text-generation model such as qwen-plus (not qwen3.5-flash — url error). Key region must match endpoint.",
+    "textLlmHint": "Used for flash-note summaries, separate from speech recognition.",
+    "textLlmProviderLabel": "Provider",
+    "textLlmProviderAliyun": "Alibaba Cloud (DashScope)",
+    "textLlmProviderCtyun": "CTyun (Wishub)",
+    "textLlmProviderTip": "Model service source. Alibaba Cloud uses DashScope; CTyun uses Wishub OpenAI-compatible API.",
     "textLlmModelLabel": "Model name",
     "textLlmModelPlaceholder": "qwen-plus",
-    "textLlmModelHelp": "Default qwen-plus (matches text-generation docs). On compatible-mode you may use qwen3.5-flash, etc., per Model Studio.",
-    "textLlmRegionLabel": "DashScope region",
+    "textLlmModelTip": "Alibaba Cloud: API model name, default qwen-plus; compatible-mode may use qwen3.5-flash; legacy text-generation URLs need text-generation models.",
+    "textLlmModelIdLabel": "Model ID",
+    "textLlmModelIdPlaceholder": "f23c54bf38b64ee194b28783d61be788",
+    "textLlmModelIdTip": "Model ID from CTyun console; sent as the model parameter. Pairs with the display name above.",
+    "textLlmModelNamePlaceholderCtyun": "DeepSeek V4 Flash",
+    "textLlmModelNameTipCtyun": "Human-readable label for your reference only; not sent to the API.",
+    "textLlmRegionLabel": "Region",
+    "textLlmRegionTipAliyun": "Must match API Key region: Beijing / Singapore / US.",
+    "textLlmRegionTipCtyun": "Wishub cluster node. Empty URL uses default wishub-x*.ctyun.cn; paste instance URL below if needed.",
     "textLlmEndpointLabel": "Text generation API URL",
-    "textLlmEndpointHelp": "Leave empty for the official compatible-mode chat/completions URL. For legacy DashScope text-generation, paste the full …/text-generation/generation URL.",
-    "textLlmApiKey": "API Key (DashScope)",
-    "textLlmApiKeyHelp": "Get API Key",
+    "textLlmEndpointTipAliyun": "Empty uses compatible-mode chat/completions. Legacy DashScope: full …/text-generation/generation URL.",
+    "textLlmEndpointTipCtyun": "Empty uses wishub-x*.ctyun.cn/v1/chat/completions by region. Paste full instance URL from service details if required.",
+    "textLlmApiKey": "API Key",
+    "textLlmApiKeyTipAliyun": "DashScope API Key; region must match above.",
+    "textLlmApiKeyTipCtyun": "CTyun AppKey / Bearer token from Token service console.",
+    "textLlmApiKeyLinkAliyun": "Get DashScope key",
+    "textLlmApiKeyLinkCtyun": "CTyun quick start",
     "glmAsrCardTitle": "GLM ASR",
     "qwenAsrCardTitle": "Qwen3 ASR Flash",
     "qwenAsrHint": "Qwen uses DashScope short-audio synchronous recognition (lower latency). Recordings are WebM (Opus); they must be uploaded to ERPNextCN on the Storage tab to obtain a public HTTPS URL. Each clip must be ≤5 minutes and ≤10 MB. Use a US Model Studio API key when the US region is selected.",
@@ -162,6 +177,9 @@
     "qwenRegionCn": "Chinese mainland (Beijing)",
     "qwenRegionIntl": "International (Singapore)",
     "qwenRegionUs": "United States (Virginia)",
+    "ctyunRegionX1": "Wishub X1",
+    "ctyunRegionX5": "Wishub X5",
+    "ctyunRegionX6": "Wishub X6",
     "qwenSubmitEndpoint": "Synchronous recognition API URL",
     "qwenSubmitEndpointHelp": "Leave empty to use the official DashScope URL for the selected region; if set, this full URL is used for ASR requests.",
     "qwenFlashModelLabel": "Flash model version",
@@ -241,6 +259,7 @@
       "textLlm": {
         "ok": "Text API reachable and key accepted",
         "noKey": "Enter text model API Key (Models tab)",
+        "noModel": "Enter CTyun Model ID (Models tab)",
         "auth": "Authentication failed—check key, region and URL",
         "endpoint": "Endpoint/model mismatch or bad URL",
         "network": "Request failed—check network",
@@ -254,6 +273,38 @@
         "unknown": "Check error: {{detail}}"
       }
     },
+    "commands": {
+      "tab": "Commands",
+      "intro": "Say your content, then the trigger phrase (e.g. 小猪佩奇总结) to run the matching prompt via the text model. Expand an item to edit its prompt.",
+      "promptLabel": "Prompt",
+      "resetDefault": "Reset to default",
+      "items": {
+        "polish": {
+          "name": "Polish",
+          "desc": "Spoken language to natural written prose"
+        },
+        "summary": {
+          "name": "Summarize",
+          "desc": "Extract key points"
+        },
+        "translate": {
+          "name": "Translate",
+          "desc": "Chinese ↔ English"
+        },
+        "wechat": {
+          "name": "WeChat",
+          "desc": "Business chat tone for IM apps"
+        },
+        "twitter": {
+          "name": "Twitter",
+          "desc": "Post-ready content for X (Twitter)"
+        },
+        "email": {
+          "name": "Email",
+          "desc": "Formal business email"
+        }
+      }
+    },
     "saveConfig": "Save Settings",
     "savingConfig": "Saving...",
     "result": {
@@ -262,7 +313,17 @@
       "apiKeyRequired": "Please enter API Key first",
       "qwenApiKeyRequired": "Please enter your DashScope API Key first",
       "connectionSuccess": "Connection successful!",
+      "connectionSuccessLlm": "Speech and text model connections are OK.",
       "connectionFailed": "Connection failed. Please check your API Key.",
+      "asrConnectionSuccess": "Speech recognition connection OK.",
+      "asrConnectionFailed": "Speech recognition failed—check API Key and endpoint.",
+      "textLlmConnectionSuccess": "Text model connection OK.",
+      "textLlmApiKeyRequired": "Enter text model API Key first.",
+      "textLlmModelIdRequired": "CTyun requires a Model ID.",
+      "textLlmConnectionFailedAuth": "Text model authentication failed—check API Key.",
+      "textLlmConnectionFailedEndpoint": "Text model endpoint error: {{detail}}",
+      "textLlmConnectionFailedNetwork": "Text model network error: {{detail}}",
+      "textLlmConnectionFailed": "Text model connection failed.",
       "testFailed": "Test failed: {{message}}"
     }
   },
@@ -347,6 +408,25 @@
     "deleteTitle": "Delete",
     "placeholderTitle": "Coming soon",
     "placeholderDesc": "This panel is reserved for upcoming features.",
+    "chat": {
+      "title": "AI Assistant",
+      "activeCommand": "AI Assistant · {{command}}",
+      "emptyTitle": "Start a conversation",
+      "emptyDesc": "Click a command on a history item, or type a message to chat with AI.",
+      "inputPlaceholder": "Type a message…",
+      "selectCommand": "Click a command on the left to start…",
+      "send": "Send",
+      "attach": "Attach file",
+      "removeAttach": "Remove attachment",
+      "thinking": "Thinking…",
+      "hint": "Enter to send, Shift+Enter for new line",
+      "noApiKey": "Configure text model API Key under Models first.",
+      "noCommand": "Select a command from history on the left first.",
+      "requestFailed": "AI request failed. Please try again.",
+      "emptySource": "This record has no text to process.",
+      "copy": "Copy reply",
+      "copySuccess": "Copied to clipboard"
+    },
     "expandRightPanel": "Expand right panel",
     "collapseRightPanel": "Collapse right panel",
     "tools": {
@@ -386,6 +466,8 @@
     "stopFailed": "Failed to stop recording",
     "generic": "Error",
     "emptyTranscription": "No speech recognized",
+    "commandNeedsTextLlm": "Command detected—configure text model API Key under Big Model first.",
+    "commandFailed": "Command failed: {{message}}",
     "recordingDataMissing": "No valid recording data received. Check the microphone and permissions, then try again.",
     "qwenNeedsErpnextUpload": "Qwen ASR requires ERPNextCN API Key on the Storage tab and a successful upload to get a public file URL.",
     "qwenFileTooLarge": "Audio exceeds the Qwen short-ASR limit (10 MB). Try a shorter recording.",

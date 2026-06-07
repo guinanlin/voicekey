@@ -81,9 +81,10 @@ describe('parseOpenAiCompatibleChatContent', () => {
 describe('generateTextWithTextLlm', () => {
   it('rejects empty API key without network', async () => {
     await expect(
-      generateTextWithTextLlm({ model: 'qwen3.5-flash', region: 'cn', apiKey: '   ' }, [
-        { role: 'user', content: 'hi' },
-      ]),
+      generateTextWithTextLlm(
+        { provider: 'aliyun', model: 'qwen3.5-flash', region: 'cn', apiKey: '   ' },
+        [{ role: 'user', content: 'hi' }],
+      ),
     ).rejects.toThrow(/API key is empty/)
   })
 })

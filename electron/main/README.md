@@ -10,11 +10,13 @@ Electron 主进程目录，负责窗口管理、IPC、录音流程、ASR 调用�
 
 - `main.ts` - 应用入口；创建后台/设置/浮窗窗口、托盘菜单与 IPC 处理，协调两条录音链路：**PTT**（短录音→转写→注入）与**闪记**（会话独占、4 分钟轮转分片、阿里云转写、SQLite 状态广播）。向后台窗口发 `SESSION_START` 时附带 `{ captureMode: 'ptt' | 'flash' }`：PTT 走与早期版本一致的极简 `getUserMedia`，闪记走设置页约束。**闪记恢复须在 `backgroundWindow` `did-finish-load` 之后执行**，否则 `SESSION_START` 早于 `AudioRecorder` 挂载会丢失，结束闪记时主进程收不到音频、`finalize` 永远卡住；托盘提供「放弃当前闪记」兜底。闪记分片转写成功后主进程打印与 PTT 对齐的耗时、UTF-8 十六进制与 `Flash transcription text:` 全文日志（带 `sessionId`/`chunkId`）。后台录音窗口 `webPreferences.backgroundThrottling: false`，避免隐藏窗口节流导致 MediaRecorder 数据几乎为空。
 - `i18n.ts` - 主进程 i18next 初始化与语言切换。
-- `config-manager.ts` - 使用 `electron-store` 持久化应用偏好、ASR 配置、**文本识别 / DashScope 文本生成（`textLlm`）**、快捷键与 ERPNextCN DTY 上传配置。
+- `config-manager.ts` - 使用 `electron-store` 持久化应用偏好、ASR 配置、**文本识别 / DashScope 文本生成（`textLlm`）**、**语音指令 Prompt（`voiceCommands`）**、快捷键与 ERPNextCN DTY 上传配置。
+- `voice-command-runner.ts` - PTT 转写后识别末尾触发词，按 `voiceCommands` 调用 `textLlm` 生成再注入。
+- `craftsman-chat.ts` - 工匠页多轮聊天：`truncateChatHistory`（10 轮）+ `generateTextWithTextLlm`（`CRAFTSMAN_CHAT` IPC）。
 - `diagnostics.ts` - 设置页「诊断」：`DIAGNOSTICS_RUN` 聚合网络探测、当前 ASR（GLM/Qwen）、`probeTextLlmConnection`、ERPNext 归档 Host 可达性（不含麦克风；麦克风在渲染进程检测）。
 - `erpnextcn-upload.ts` - 通用 multipart 上传（`contentType` 由调用方指定）；千问用 `audio/webm`，GLM 归档用 `audio/mpeg`。`fileUrlFromErpnextUploadResponse` 从成功响应拼公网 HTTPS URL 供 DashScope `audio` 使用。
 - `qwen-asr-provider.ts` - 阿里云 DashScope **短音频同步** ASR：`POST .../multimodal-generation/generation`（URL 可由 `asr.qwenSubmitUrl` 覆盖，否则按地域拼官方地址），`input.messages` 中带公网 `audio` URL；解析 `output.choices[0].message.content` 中的 `text`。模型按地域为 `qwen3-asr-flash` 或 `qwen3-asr-flash-us`。含 `testQwenDashScopeConnection`。
-- `dashscope-text-generation.ts` - DashScope **文本对话**：默认 compatible-mode；legacy 为 `text-generation/generation`（须搭配 **qwen-plus** 等纯文本模型，与 qwen3.5-flash 混用会 url error）。`parameters` 含 `temperature`/`top_p`/`enable_thinking:false`（对齐控制台、关闭深度思考）。供闪记 `FLASH_GENERATE_SUMMARY`。
+- `dashscope-text-generation.ts` - 文本对话：**阿里云** DashScope compatible-mode / legacy text-generation；**天翼云** Wishub OpenAI 兼容。供闪记 `FLASH_GENERATE_SUMMARY`。
 - `flash-note-repository.ts` - 闪记 SQLite 仓储层：初始化 `flash_sessions` / `flash_chunks` 表与索引，封装会话/分片的查询与状态更新；含 `getSessionWithChunksById` 供按会话拉取分片（如 AI 总结）。
 - `history-manager.ts` - 录音历史存储（最多 1000 条），提供增删清空与统计接口。
 - `hotkey-manager.ts` - 基于 `globalShortcut` 的全局快捷键注册/注销。

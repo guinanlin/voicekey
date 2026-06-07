@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Eye, EyeOff, Loader2, XCircle } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleHelp,
+  Eye,
+  EyeOff,
+  Loader2,
+  XCircle,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   AUDIO_CAPTURE_OPUS_BITRATE_OPTIONS,
@@ -8,16 +16,21 @@ import {
   ERPNEXTCN_DTY,
   qwenMultimodalGenerationUrl,
   qwenShortAsrModelName,
-  qwenCompatibleChatCompletionsUrl,
+  textLlmDefaultGenerationUrl,
 } from '@electron/shared/constants'
 import { getLocale, resolveLanguage, type LanguageSetting } from '@electron/shared/i18n'
 import type {
   AppConfig,
   DiagnosticItem,
   QwenCnIntlFlashModelId,
+  TextLlmProbeResult,
+  TextLlmProvider,
+  TextLlmRegion,
   UpdateInfo,
 } from '@electron/shared/types'
+import { CommandSettings } from '@/components/CommandSettings'
 import { HotkeySettings } from '@/components/HotkeySettings'
+import { normalizeVoiceCommandsConfig } from '@electron/shared/voice-commands'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,7 +45,30 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { toast } from 'sonner'
+
+function FieldLabel({ htmlFor, label, tip }: { htmlFor: string; label: string; tip: string }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Label htmlFor={htmlFor}>{label}</Label>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex text-muted-foreground hover:text-foreground no-drag"
+            aria-label={tip}
+          >
+            <CircleHelp className="size-3.5 shrink-0" aria-hidden />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-left">
+          {tip}
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  )
+}
 
 async function probeMicrophoneForDiagnostics(): Promise<DiagnosticItem> {
   if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -101,11 +137,14 @@ export default function SettingsPage() {
       apiKey: '',
     },
     textLlm: {
+      provider: 'aliyun',
       model: DASHSCOPE.TEXT_LLM_DEFAULT_MODEL,
+      modelName: '',
       region: 'cn',
       apiKey: '',
       generationUrl: '',
     },
+    voiceCommands: normalizeVoiceCommandsConfig(undefined),
   })
 
   const [testing, setTesting] = useState(false)
@@ -121,6 +160,7 @@ export default function SettingsPage() {
   const [diagnosticItems, setDiagnosticItems] = useState<DiagnosticItem[]>([])
   const [diagnosticRunning, setDiagnosticRunning] = useState(false)
   const [diagnosticLastRun, setDiagnosticLastRun] = useState<string | null>(null)
+  const [activeSettingsTab, setActiveSettingsTab] = useState('general')
   const hasLoadedConfig = useRef(false)
   const hasLoadedUpdateStatus = useRef(false)
 
@@ -183,6 +223,7 @@ export default function SettingsPage() {
         asr: config.asr,
         erpnextcnDty: config.erpnextcnDty,
         textLlm: config.textLlm,
+        voiceCommands: config.voiceCommands,
       })
 
       setTestResult({ type: 'success', message: t('settings.result.saveSuccess') })
@@ -197,7 +238,91 @@ export default function SettingsPage() {
     }
   }
 
+  const formatTextLlmProbeError = (result: TextLlmProbeResult): string => {
+    switch (result.code) {
+      case 'no_key':
+        return t('settings.result.textLlmApiKeyRequired')
+      case 'no_model':
+        return t('settings.result.textLlmModelIdRequired')
+      case 'auth':
+        return t('settings.result.textLlmConnectionFailedAuth')
+      case 'network':
+        return t('settings.result.textLlmConnectionFailedNetwork', {
+          detail: result.detail ?? '',
+        })
+      case 'endpoint':
+        return t('settings.result.textLlmConnectionFailedEndpoint', {
+          detail: result.detail ?? '',
+        })
+      default:
+        return t('settings.result.textLlmConnectionFailed')
+    }
+  }
+
   const handleTestConnection = async () => {
+    if (activeSettingsTab === 'llm') {
+      const asrHasKey =
+        config.asr.provider === 'qwen'
+          ? !!config.asr.qwenApiKey?.trim()
+          : !!config.asr.apiKeys[config.asr.region || 'cn']?.trim()
+      const textKey = config.textLlm.apiKey?.trim()
+
+      if (!asrHasKey && !textKey) {
+        setTestResult({ type: 'error', message: t('settings.result.textLlmApiKeyRequired') })
+        return
+      }
+
+      setTesting(true)
+      setTestResult(null)
+      try {
+        const api = window.electronAPI
+        if (!api?.testTextLlmConnection) {
+          setTestResult({ type: 'error', message: t('settings.result.connectionFailed') })
+          return
+        }
+
+        const messages: string[] = []
+        let allOk = true
+
+        if (asrHasKey && api.testConnection) {
+          const asrOk = await api.testConnection(config.asr)
+          if (asrOk) {
+            messages.push(t('settings.result.asrConnectionSuccess'))
+          } else {
+            allOk = false
+            messages.push(t('settings.result.asrConnectionFailed'))
+          }
+        }
+
+        if (textKey) {
+          const textResult = await api.testTextLlmConnection(config.textLlm)
+          if (textResult.ok) {
+            messages.push(t('settings.result.textLlmConnectionSuccess'))
+          } else {
+            allOk = false
+            messages.push(formatTextLlmProbeError(textResult))
+          }
+        }
+
+        setTestResult({
+          type: allOk ? 'success' : 'error',
+          message:
+            allOk && messages.length === 2
+              ? t('settings.result.connectionSuccessLlm')
+              : messages.join(' '),
+        })
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : t('common.unknownError')
+        setTestResult({
+          type: 'error',
+          message: t('settings.result.testFailed', { message: errorMessage }),
+        })
+      } finally {
+        setTesting(false)
+      }
+      return
+    }
+
     if (config.asr.provider === 'qwen') {
       const qk = config.asr.qwenApiKey?.trim() ?? ''
       if (!qk) {
@@ -293,11 +418,27 @@ export default function SettingsPage() {
   const currentRegion = config.asr.region || 'cn'
   const currentApiKey = config.asr.apiKeys?.[currentRegion] || ''
   const qwenDefaultMultimodalUrl = qwenMultimodalGenerationUrl(config.asr.qwenRegion)
-  const textLlmDefaultGenerationUrl = qwenCompatibleChatCompletionsUrl(config.textLlm.region)
+  const textLlmProvider = config.textLlm.provider ?? 'aliyun'
+  const textLlmEndpointPlaceholder = textLlmDefaultGenerationUrl(
+    textLlmProvider,
+    config.textLlm.region,
+  )
   const glmDefaultEndpoint =
     currentRegion === 'intl'
       ? 'https://api.z.ai/api/paas/v4/audio/transcriptions'
       : 'https://open.bigmodel.cn/api/paas/v4/audio/transcriptions'
+
+  const asrHasKeyForTest =
+    config.asr.provider === 'qwen'
+      ? !!config.asr.qwenApiKey?.trim()
+      : !!config.asr.apiKeys[currentRegion]?.trim()
+  const textLlmHasKeyForTest = !!config.textLlm.apiKey?.trim()
+  const testConnectionDisabled =
+    activeSettingsTab === 'llm'
+      ? !asrHasKeyForTest && !textLlmHasKeyForTest
+      : config.asr.provider === 'qwen'
+        ? !config.asr.qwenApiKey?.trim()
+        : !currentApiKey
 
   const opusBitrateSelectModel = useMemo(() => {
     const value =
@@ -499,7 +640,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex max-w-4xl flex-col gap-5">
-      <Tabs defaultValue="general" className="w-full gap-0">
+      <Tabs value={activeSettingsTab} onValueChange={setActiveSettingsTab} className="w-full gap-0">
         {/* 吸顶条 py-3 + 底部分隔线 border-b；TabsContent mt-4 与首张 Card 紧凑 */}
         <div className="sticky top-0 z-20 isolate shrink-0 border-b border-border bg-background py-3">
           <TabsList className="inline-flex h-auto min-h-9 w-fit max-w-full flex-wrap items-center justify-start gap-0.5 self-start rounded-md bg-muted/50 p-0.5">
@@ -526,6 +667,12 @@ export default function SettingsPage() {
               className="h-8 flex-none px-3 py-1.5 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
             >
               {t('hotkey.title')}
+            </TabsTrigger>
+            <TabsTrigger
+              value="commands"
+              className="h-8 flex-none px-3 py-1.5 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              {t('settings.commands.tab')}
             </TabsTrigger>
             <TabsTrigger
               value="diagnostics"
@@ -1071,59 +1218,177 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-xl font-bold">{t('settings.textLlmTitle')}</CardTitle>
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-1.5">
+                <CardTitle className="text-xl font-bold">{t('settings.textLlmTitle')}</CardTitle>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex text-muted-foreground hover:text-foreground no-drag"
+                      aria-label={t('settings.textLlmHint')}
+                    >
+                      <CircleHelp className="size-4 shrink-0" aria-hidden />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs text-left">
+                    {t('settings.textLlmHint')}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Alert className="border-muted-foreground/25 bg-muted/40">
-                <AlertDescription className="text-sm text-muted-foreground">
-                  {t('settings.textLlmHint')}
-                </AlertDescription>
-              </Alert>
               <div className="space-y-2">
-                <Label htmlFor="textLlmModel">{t('settings.textLlmModelLabel')}</Label>
-                <Input
-                  id="textLlmModel"
-                  value={config.textLlm.model}
-                  onChange={(e) =>
-                    setConfig((prev) => ({
-                      ...prev,
-                      textLlm: { ...prev.textLlm, model: e.target.value },
-                    }))
-                  }
-                  placeholder={t('settings.textLlmModelPlaceholder')}
-                  className="no-drag font-mono text-sm"
-                  autoComplete="off"
+                <FieldLabel
+                  htmlFor="textLlmProvider"
+                  label={t('settings.textLlmProviderLabel')}
+                  tip={t('settings.textLlmProviderTip')}
                 />
-                <p className="text-sm text-muted-foreground">{t('settings.textLlmModelHelp')}</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="textLlmRegion">{t('settings.textLlmRegionLabel')}</Label>
                 <Select
-                  value={config.textLlm.region}
+                  value={textLlmProvider}
                   onValueChange={(value) =>
                     setConfig((prev) => ({
                       ...prev,
                       textLlm: {
                         ...prev.textLlm,
-                        region: value as 'cn' | 'intl' | 'us',
+                        provider: value as TextLlmProvider,
+                        region: value === 'ctyun' ? 'x1' : 'cn',
                         generationUrl: '',
                       },
                     }))
                   }
                 >
-                  <SelectTrigger id="textLlmRegion" className="no-drag w-full cursor-pointer">
-                    <SelectValue placeholder={t('settings.languagePlaceholder')} />
+                  <SelectTrigger id="textLlmProvider" className="no-drag w-full cursor-pointer">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cn">{t('settings.qwenRegionCn')}</SelectItem>
-                    <SelectItem value="intl">{t('settings.qwenRegionIntl')}</SelectItem>
-                    <SelectItem value="us">{t('settings.qwenRegionUs')}</SelectItem>
+                    <SelectItem value="aliyun">{t('settings.textLlmProviderAliyun')}</SelectItem>
+                    <SelectItem value="ctyun">{t('settings.textLlmProviderCtyun')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {textLlmProvider === 'ctyun' ? (
+                  <>
+                    <div className="space-y-2">
+                      <FieldLabel
+                        htmlFor="textLlmModelName"
+                        label={t('settings.textLlmModelLabel')}
+                        tip={t('settings.textLlmModelNameTipCtyun')}
+                      />
+                      <Input
+                        id="textLlmModelName"
+                        value={config.textLlm.modelName ?? ''}
+                        onChange={(e) =>
+                          setConfig((prev) => ({
+                            ...prev,
+                            textLlm: { ...prev.textLlm, modelName: e.target.value },
+                          }))
+                        }
+                        placeholder={t('settings.textLlmModelNamePlaceholderCtyun')}
+                        className="no-drag text-sm"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel
+                        htmlFor="textLlmModelId"
+                        label={t('settings.textLlmModelIdLabel')}
+                        tip={t('settings.textLlmModelIdTip')}
+                      />
+                      <Input
+                        id="textLlmModelId"
+                        value={config.textLlm.model}
+                        onChange={(e) =>
+                          setConfig((prev) => ({
+                            ...prev,
+                            textLlm: { ...prev.textLlm, model: e.target.value },
+                          }))
+                        }
+                        placeholder={t('settings.textLlmModelIdPlaceholder')}
+                        className="no-drag font-mono text-sm"
+                        autoComplete="off"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-2 sm:col-span-1">
+                    <FieldLabel
+                      htmlFor="textLlmModel"
+                      label={t('settings.textLlmModelLabel')}
+                      tip={t('settings.textLlmModelTip')}
+                    />
+                    <Input
+                      id="textLlmModel"
+                      value={config.textLlm.model}
+                      onChange={(e) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          textLlm: { ...prev.textLlm, model: e.target.value },
+                        }))
+                      }
+                      placeholder={t('settings.textLlmModelPlaceholder')}
+                      className="no-drag font-mono text-sm"
+                      autoComplete="off"
+                    />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <FieldLabel
+                    htmlFor="textLlmRegion"
+                    label={t('settings.textLlmRegionLabel')}
+                    tip={
+                      textLlmProvider === 'ctyun'
+                        ? t('settings.textLlmRegionTipCtyun')
+                        : t('settings.textLlmRegionTipAliyun')
+                    }
+                  />
+                  <Select
+                    value={config.textLlm.region}
+                    onValueChange={(value) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        textLlm: {
+                          ...prev.textLlm,
+                          region: value as TextLlmRegion,
+                          generationUrl: '',
+                        },
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="textLlmRegion" className="no-drag w-full cursor-pointer">
+                      <SelectValue placeholder={t('settings.languagePlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {textLlmProvider === 'ctyun' ? (
+                        <>
+                          <SelectItem value="x1">{t('settings.ctyunRegionX1')}</SelectItem>
+                          <SelectItem value="x5">{t('settings.ctyunRegionX5')}</SelectItem>
+                          <SelectItem value="x6">{t('settings.ctyunRegionX6')}</SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="cn">{t('settings.qwenRegionCn')}</SelectItem>
+                          <SelectItem value="intl">{t('settings.qwenRegionIntl')}</SelectItem>
+                          <SelectItem value="us">{t('settings.qwenRegionUs')}</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="textLlmGenerationUrl">{t('settings.textLlmEndpointLabel')}</Label>
+                <FieldLabel
+                  htmlFor="textLlmGenerationUrl"
+                  label={t('settings.textLlmEndpointLabel')}
+                  tip={
+                    textLlmProvider === 'ctyun'
+                      ? t('settings.textLlmEndpointTipCtyun')
+                      : t('settings.textLlmEndpointTipAliyun')
+                  }
+                />
                 <Input
                   id="textLlmGenerationUrl"
                   type="url"
@@ -1136,13 +1401,21 @@ export default function SettingsPage() {
                       textLlm: { ...prev.textLlm, generationUrl: e.target.value },
                     }))
                   }
-                  placeholder={textLlmDefaultGenerationUrl}
+                  placeholder={textLlmEndpointPlaceholder}
                   className="no-drag font-mono text-sm"
                 />
-                <p className="text-sm text-muted-foreground">{t('settings.textLlmEndpointHelp')}</p>
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="textLlmApiKey">{t('settings.textLlmApiKey')}</Label>
+                <FieldLabel
+                  htmlFor="textLlmApiKey"
+                  label={t('settings.textLlmApiKey')}
+                  tip={
+                    textLlmProvider === 'ctyun'
+                      ? t('settings.textLlmApiKeyTipCtyun')
+                      : t('settings.textLlmApiKeyTipAliyun')
+                  }
+                />
                 <div className="relative">
                   <Input
                     id="textLlmApiKey"
@@ -1176,17 +1449,20 @@ export default function SettingsPage() {
                     )}
                   </Button>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {t('settings.textLlmApiKeyHelp')}{' '}
-                  <a
-                    href="https://help.aliyun.com/zh/model-studio/get-api-key"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    help.aliyun.com
-                  </a>
-                </p>
+                <a
+                  href={
+                    textLlmProvider === 'ctyun'
+                      ? 'https://www.ctyun.cn/document/11061839/11062271'
+                      : 'https://help.aliyun.com/zh/model-studio/get-api-key'
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary hover:underline"
+                >
+                  {textLlmProvider === 'ctyun'
+                    ? t('settings.textLlmApiKeyLinkCtyun')
+                    : t('settings.textLlmApiKeyLinkAliyun')}
+                </a>
               </div>
             </CardContent>
           </Card>
@@ -1263,6 +1539,13 @@ export default function SettingsPage() {
 
         <TabsContent value="hotkeys" className="mt-4 space-y-6">
           <HotkeySettings />
+        </TabsContent>
+
+        <TabsContent value="commands" className="mt-4 space-y-6">
+          <CommandSettings
+            commands={config.voiceCommands}
+            onChange={(voiceCommands) => setConfig((prev) => ({ ...prev, voiceCommands }))}
+          />
         </TabsContent>
 
         <TabsContent value="diagnostics" className="mt-4 space-y-6">
@@ -1485,10 +1768,7 @@ export default function SettingsPage() {
         <Button
           variant="secondary"
           onClick={handleTestConnection}
-          disabled={
-            testing ||
-            (config.asr.provider === 'qwen' ? !config.asr.qwenApiKey?.trim() : !currentApiKey)
-          }
+          disabled={testing || testConnectionDisabled}
           className="no-drag flex-1 cursor-pointer"
         >
           {testing ? t('settings.testingConnection') : t('settings.testConnection')}

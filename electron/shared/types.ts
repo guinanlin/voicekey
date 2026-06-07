@@ -142,18 +142,64 @@ export type FlashGenerateSummaryResult =
   | { ok: true; summary: string }
   | { ok: false; code: FlashGenerateSummaryErrorCode; message?: string }
 
-/** DashScope 文本对话（默认 OpenAI 兼容 chat/completions；可选手写旧版 text-generation URL） */
+/** 文本 LLM 渠道：阿里云百炼 DashScope / 天翼云 Wishub */
+export type TextLlmProvider = 'aliyun' | 'ctyun'
+
+/** 天翼云 Wishub 推理集群（wishub-x*.ctyun.cn） */
+export type CtyunWishubRegion = 'x1' | 'x5' | 'x6'
+
+/** 文本 LLM 区域：阿里云 cn/intl/us；天翼云 x1/x5/x6 */
+export type TextLlmRegion = 'cn' | 'intl' | 'us' | CtyunWishubRegion
+
+/** 文本对话（默认 OpenAI 兼容 chat/completions；阿里云可选手写旧版 text-generation URL） */
 export interface TextLlmConfig {
-  /** 模型名，默认 qwen-plus（与 text-generation 官方示例一致；compatible-mode 可换 qwen3.5-flash） */
+  /** 渠道来源，默认 aliyun（兼容旧配置） */
+  provider: TextLlmProvider
+  /**
+   * 请求体 `model` 字段：阿里云即模型名（如 qwen-plus）；
+   * 天翼云为控制台 Model ID（如 f23c54bf…，opaque hex）。
+   */
   model: string
-  /** cn=北京；intl=新加坡；us=美国（弗吉尼亚） */
-  region: 'cn' | 'intl' | 'us'
+  /** 天翼云专用：可读模型名（如 DeepSeek V4 Flash），仅展示/备注，不参与 API 请求 */
+  modelName?: string
+  /** 区域：阿里云 cn/intl/us；天翼云 x1/x5/x6 */
+  region: TextLlmRegion
   apiKey: string
   /**
-   * 完整请求 URL。留空则按 region 使用官方 **compatible-mode/v1/chat/completions**。
-   * 若填写含 `.../text-generation/generation` 的地址，则按旧版 DashScope 文本生成协议请求。
+   * 完整请求 URL。留空则按 provider + region 使用官方默认地址。
+   * 阿里云若填写含 `.../text-generation/generation` 的地址，则走旧版 DashScope 协议。
    */
   generationUrl?: string
+}
+
+export type TextLlmProbeCode =
+  | 'ok'
+  | 'no_key'
+  | 'no_model'
+  | 'auth'
+  | 'endpoint'
+  | 'network'
+  | 'unknown'
+
+export interface TextLlmProbeResult {
+  ok: boolean
+  code: TextLlmProbeCode
+  detail?: string
+}
+
+/** 语音指令 ID；与设置页、PTT 命令词一一对应 */
+export type VoiceCommandId = 'polish' | 'summary' | 'translate' | 'wechat' | 'twitter' | 'email'
+
+/** 单条语音指令：触发词 + 系统 Prompt */
+export interface VoiceCommandItem {
+  id: VoiceCommandId
+  trigger: string
+  prompt: string
+}
+
+/** 设置页「指令」Tab 持久化结构 */
+export interface VoiceCommandsConfig {
+  commands: VoiceCommandItem[]
 }
 
 export interface AppConfig {
@@ -162,6 +208,7 @@ export interface AppConfig {
   hotkey: HotkeyConfig
   erpnextcnDty: ErpnextcnDtyConfig
   textLlm: TextLlmConfig
+  voiceCommands: VoiceCommandsConfig
 }
 
 export interface HistoryItem {
@@ -213,12 +260,34 @@ export interface DiagnosticsRunResult {
   items: DiagnosticItem[]
 }
 
+/** 工匠聊天消息角色（不含 system，system 单独传） */
+export type CraftsmanChatRole = 'user' | 'assistant'
+
+export interface CraftsmanChatMessage {
+  role: CraftsmanChatRole
+  content: string
+}
+
+export interface CraftsmanChatPayload {
+  systemPrompt: string
+  /** 不含 system；含当前待回复的 user 消息 */
+  messages: CraftsmanChatMessage[]
+}
+
+export interface CraftsmanChatResult {
+  ok: boolean
+  content?: string
+  code?: 'no_api_key' | 'empty_response' | 'request_failed'
+  message?: string
+}
+
 // IPC 通道定义
 export const IPC_CHANNELS = {
   // 配置相关
   CONFIG_GET: 'config:get',
   CONFIG_SET: 'config:set',
   CONFIG_TEST: 'config:test',
+  CONFIG_TEST_TEXT_LLM: 'config:test-text-llm',
   DIAGNOSTICS_RUN: 'diagnostics:run',
 
   // 录音会话相关
@@ -246,6 +315,9 @@ export const IPC_CHANNELS = {
   HISTORY_CLEAR: 'history:clear',
   HISTORY_DELETE: 'history:delete',
   HISTORY_CHANGED: 'history:changed',
+
+  // 工匠聊天
+  CRAFTSMAN_CHAT: 'craftsman:chat',
 
   // 闪记相关
   FLASH_GET_SESSIONS: 'flash:get-sessions',

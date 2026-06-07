@@ -33,7 +33,7 @@ import {
   uploadErpnextcnDtyFile,
   uploadErpnextcnDtyMp3,
 } from './erpnextcn-upload'
-import { generateTextWithTextLlm } from './dashscope-text-generation'
+import { generateTextWithTextLlm, probeTextLlmConnection } from './dashscope-text-generation'
 import { runMainProcessDiagnostics } from './diagnostics'
 import { testQwenDashScopeConnection, transcribeQwenFromFileUrl } from './qwen-asr-provider'
 import { historyManager } from './history-manager'
@@ -41,10 +41,14 @@ import { hotkeyManager } from './hotkey-manager'
 import { initMainI18n, setMainLanguage, t } from './i18n'
 import { ioHookManager } from './iohook-manager'
 import { textInjector } from './text-injector'
+import { resolveTextForInjection } from './voice-command-runner'
+import { runCraftsmanChat } from './craftsman-chat'
 import { UpdaterManager } from './updater-manager'
 import { startHttpServer, stopHttpServer } from './http-server'
 import {
   ASRConfig,
+  CraftsmanChatPayload,
+  CraftsmanChatResult,
   DiagnosticsRunResult,
   FlashChunkStatus,
   FlashGenerateSummaryPayload,
@@ -52,6 +56,7 @@ import {
   IPC_CHANNELS,
   OverlayState,
   RecorderLockOwner,
+  TextLlmConfig,
   VoiceSession,
 } from '../shared/types'
 import { FlashNoteRepository } from './flash-note-repository'
@@ -1117,14 +1122,19 @@ async function handlePTTAudioData(buffer: Buffer) {
     const trimmedText = transcription.text.trim()
     let injectDuration = 0
     if (trimmedText.length > 0) {
+      const resolved = await resolveTextForInjection(trimmedText)
+      if (resolved.usedCommand) {
+        console.log(`[Main] Voice command "${resolved.commandId}" applied`)
+      }
+
       historyManager.add({
-        text: transcription.text,
+        text: resolved.text,
         duration: currentSession.duration,
       })
 
       const injectStartTime = Date.now()
       console.log(`[Main] [${new Date().toISOString()}] Injecting text...`)
-      await textInjector.injectText(transcription.text)
+      await textInjector.injectText(resolved.text)
       injectDuration = Date.now() - injectStartTime
       console.log(`[Main] ⏱️  Text injection took ${injectDuration}ms`)
 
@@ -1369,6 +1379,9 @@ function setupIPCHandlers() {
     if (config.textLlm) {
       configManager.setTextLlmConfig(config.textLlm)
     }
+    if (config.voiceCommands) {
+      configManager.setVoiceCommandsConfig(config.voiceCommands)
+    }
   })
 
   ipcMain.handle(IPC_CHANNELS.CONFIG_TEST, async (_event, config?: ASRConfig) => {
@@ -1385,6 +1398,18 @@ function setupIPCHandlers() {
     }
     return await asrProvider.testConnection()
   })
+
+  ipcMain.handle(IPC_CHANNELS.CONFIG_TEST_TEXT_LLM, async (_event, config?: TextLlmConfig) => {
+    const cfg = config ?? configManager.getTextLlmConfig()
+    return await probeTextLlmConnection(cfg)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.CRAFTSMAN_CHAT,
+    async (_event, payload: CraftsmanChatPayload): Promise<CraftsmanChatResult> => {
+      return await runCraftsmanChat(payload)
+    },
+  )
 
   ipcMain.handle(IPC_CHANNELS.DIAGNOSTICS_RUN, async (): Promise<DiagnosticsRunResult> => {
     return await runMainProcessDiagnostics(

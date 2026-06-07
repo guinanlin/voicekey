@@ -7,16 +7,19 @@ import {
   HotkeyConfig,
   type QwenCnIntlFlashModelId,
   type TextLlmConfig,
+  type VoiceCommandsConfig,
 } from '../shared/types'
+import { normalizeVoiceCommandsConfig } from '../shared/voice-commands'
 import {
   DASHSCOPE,
   DEFAULT_AUDIO_CAPTURE_PREFERENCES,
   DEFAULT_HOTKEYS,
   ERPNEXTCN_DTY,
-  type QwenDashScopeRegion,
+  normalizeTextLlmProvider,
+  normalizeTextLlmRegion,
 } from '../shared/constants'
 
-function normalizeQwenRegion(raw: unknown): QwenDashScopeRegion {
+function normalizeQwenRegion(raw: unknown): 'cn' | 'intl' | 'us' {
   if (raw === 'intl' || raw === 'us') return raw
   return 'cn'
 }
@@ -33,6 +36,7 @@ interface ConfigSchema {
   hotkey: HotkeyConfig
   erpnextcnDty: ErpnextcnDtyConfig
   textLlm: TextLlmConfig
+  voiceCommands: VoiceCommandsConfig
 }
 
 // 默认配置
@@ -67,11 +71,14 @@ const defaultConfig: AppConfig = {
     apiKey: '',
   },
   textLlm: {
+    provider: 'aliyun',
     model: DASHSCOPE.TEXT_LLM_DEFAULT_MODEL,
+    modelName: '',
     region: 'cn',
     apiKey: '',
     generationUrl: '',
   },
+  voiceCommands: normalizeVoiceCommandsConfig(undefined),
 }
 
 // 配置管理器
@@ -116,11 +123,15 @@ export class ConfigManager {
     if (!textLlmRaw) {
       this.store.set('textLlm', defaultConfig.textLlm)
     } else {
+      const provider = normalizeTextLlmProvider(textLlmRaw.provider)
+      if (textLlmRaw.provider === undefined) {
+        this.store.set('textLlm', { ...textLlmRaw, provider: 'aliyun' })
+      }
       const genUrl = (textLlmRaw.generationUrl ?? '').trim()
       const usesLegacyTextGen = genUrl.includes('text-generation/generation')
       const m = (textLlmRaw.model ?? '').trim()
-      if (usesLegacyTextGen && m === 'qwen3.5-flash') {
-        this.store.set('textLlm', { ...textLlmRaw, model: 'qwen-plus' })
+      if (provider === 'aliyun' && usesLegacyTextGen && m === 'qwen3.5-flash') {
+        this.store.set('textLlm', { ...textLlmRaw, provider, model: 'qwen-plus' })
       }
     }
 
@@ -132,6 +143,13 @@ export class ConfigManager {
         audioCapture: DEFAULT_AUDIO_CAPTURE_PREFERENCES,
       })
     }
+
+    const voiceRaw = this.store.get('voiceCommands') as VoiceCommandsConfig | undefined
+    if (!voiceRaw?.commands?.length) {
+      this.store.set('voiceCommands', defaultConfig.voiceCommands)
+    } else {
+      this.store.set('voiceCommands', normalizeVoiceCommandsConfig(voiceRaw))
+    }
   }
 
   // 获取完整配置
@@ -142,6 +160,7 @@ export class ConfigManager {
       hotkey: this.getHotkeyConfig(),
       erpnextcnDty: this.getErpnextcnDtyFromStore(),
       textLlm: this.getTextLlmConfig(),
+      voiceCommands: this.getVoiceCommandsConfig(),
     }
   }
 
@@ -239,10 +258,13 @@ export class ConfigManager {
 
   getTextLlmConfig(): TextLlmConfig {
     const config = this.store.get('textLlm', defaultConfig.textLlm)
+    const provider = normalizeTextLlmProvider(config.provider)
     const modelTrim = config.model?.trim()
     return {
+      provider,
       model: modelTrim || DASHSCOPE.TEXT_LLM_DEFAULT_MODEL,
-      region: normalizeQwenRegion(config.region),
+      modelName: config.modelName?.trim() ?? '',
+      region: normalizeTextLlmRegion(config.region, provider),
       apiKey: config.apiKey ?? '',
       generationUrl: config.generationUrl ?? '',
     }
@@ -251,6 +273,15 @@ export class ConfigManager {
   setTextLlmConfig(config: Partial<TextLlmConfig>): void {
     const current = this.getTextLlmConfig()
     this.store.set('textLlm', { ...current, ...config })
+  }
+
+  getVoiceCommandsConfig(): VoiceCommandsConfig {
+    const raw = this.store.get('voiceCommands') as VoiceCommandsConfig | undefined
+    return normalizeVoiceCommandsConfig(raw)
+  }
+
+  setVoiceCommandsConfig(config: VoiceCommandsConfig): void {
+    this.store.set('voiceCommands', normalizeVoiceCommandsConfig(config))
   }
 
   // 重置为默认配置

@@ -20,7 +20,9 @@ IPC 通信桥接脚本，运行在渲染进程上下文但可访问部分 Node.j
 
 - `getConfig()` - 获取完整应用配置
 - `setConfig(config)` - 保存配置（可含 `app.audioCapture` 录音参数等，`CONFIG_SET` 内与已有配置合并）
-- `testConnection(config)` - 测试 ASR API 连接
+- `testConnection(config?)` - 测试 ASR API 连接
+- `testTextLlmConnection(config?)` - 测试文本模型连接（阿里云/天翼云，`CONFIG_TEST_TEXT_LLM`）
+- `craftsmanChat(payload)` - 工匠页多轮聊天，调用文本模型（`CRAFTSMAN_CHAT`）
 - `runDiagnostics()` - 主进程诊断（网络 / ASR / 文本模型 / 归档），返回 `DiagnosticsRunResult`（`IPC_CHANNELS.DIAGNOSTICS_RUN`）
 
 **录音会话**

@@ -40,6 +40,14 @@ shadcn/ui 组件库，基于 Radix UI 构建的可复用 UI 组件集合。包�
 - 录制并发送快捷键数据回主进程
 - 不渲染任何 UI（返回 `null`）
 
+### `ChatPanel.tsx`
+
+工匠页右侧聊天组件：`ref.startCommand` 接收指令 Prompt + 历史文本并自动发起首条请求；多轮对话经 `craftsmanChat` IPC 调用文本模型（保留最近 10 轮上下文）；AI 回复气泡右下角可复制；附件仅 UI 展示；发送后自动滚底。
+
+### `CommandSettings.tsx`
+
+设置页「指令」Tab：折叠列表展示 6 条内置指令（润色/总结/翻译/微信/推特/邮件），展开后编辑 Prompt、单条恢复默认；触发词只读展示。
+
 ## HotkeySettings
 
 快捷键设置组件，负责：

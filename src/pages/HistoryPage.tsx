@@ -12,6 +12,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { getLocale } from '@electron/shared/i18n'
+import type { VoiceCommandId, VoiceCommandItem } from '@electron/shared/types'
+import { findVoiceCommandById } from '@electron/shared/voice-commands'
+import { ChatPanel, type ChatPanelHandle, type StartCommandParams } from '@/components/ChatPanel'
 
 interface HistoryItem {
   id: string
@@ -30,6 +33,18 @@ const HISTORY_ITEM_TOOLS = [
   { id: 'twitter', labelKey: 'history.tools.twitter' },
   { id: 'email', labelKey: 'history.tools.email' },
 ] as const
+
+type HistoryToolId = (typeof HISTORY_ITEM_TOOLS)[number]['id']
+
+const TOOL_TO_COMMAND_ID: Record<HistoryToolId, VoiceCommandId> = {
+  polish: 'polish',
+  summarize: 'summary',
+  translate: 'translate',
+  wechat: 'wechat',
+  twitter: 'twitter',
+  email: 'email',
+}
+
 const RIGHT_PANEL_KEY = 'voicekey-craftsman-right-panel'
 const SPLIT_RATIO_KEY = 'voicekey-craftsman-split-ratio'
 const MIN_PANEL_RATIO = 0.25
@@ -64,13 +79,28 @@ export default function HistoryPage() {
   const [loading, setLoading] = React.useState(true)
   const [rightPanelOpen, setRightPanelOpen] = React.useState(readRightPanelOpen)
   const [leftRatio, setLeftRatio] = React.useState(readSplitRatio)
+  const [voiceCommands, setVoiceCommands] = React.useState<VoiceCommandItem[]>([])
+  const [pendingCommand, setPendingCommand] = React.useState<StartCommandParams | null>(null)
   const containerRef = React.useRef<HTMLDivElement>(null)
+  const chatRef = React.useRef<ChatPanelHandle>(null)
   const draggingRef = React.useRef(false)
   const leftRatioRef = React.useRef(leftRatio)
 
   React.useEffect(() => {
     leftRatioRef.current = leftRatio
   }, [leftRatio])
+
+  const openRightPanel = React.useCallback(() => {
+    setRightPanelOpen((prev) => {
+      if (prev) return prev
+      try {
+        localStorage.setItem(RIGHT_PANEL_KEY, '1')
+      } catch {
+        /* ignore quota / private mode */
+      }
+      return true
+    })
+  }, [])
 
   const toggleRightPanel = React.useCallback(() => {
     setRightPanelOpen((prev) => {
@@ -83,6 +113,57 @@ export default function HistoryPage() {
       return next
     })
   }, [])
+
+  React.useEffect(() => {
+    const loadCommands = async () => {
+      try {
+        const config = await window.electronAPI?.getConfig?.()
+        if (config?.voiceCommands?.commands) {
+          setVoiceCommands(config.voiceCommands.commands)
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    void loadCommands()
+  }, [])
+
+  React.useEffect(() => {
+    if (!pendingCommand || !rightPanelOpen) return
+    void chatRef.current?.startCommand(pendingCommand).finally(() => setPendingCommand(null))
+  }, [pendingCommand, rightPanelOpen])
+
+  const runHistoryTool = React.useCallback(
+    (toolId: HistoryToolId, item: HistoryItem) => {
+      const text = item.text.trim()
+      if (!text) {
+        toast.error(t('history.chat.emptySource'))
+        return
+      }
+
+      const commandId = TOOL_TO_COMMAND_ID[toolId]
+      const cmd = findVoiceCommandById(voiceCommands, commandId)
+      if (!cmd) {
+        toast.error(t('history.chat.requestFailed'))
+        return
+      }
+
+      const params: StartCommandParams = {
+        commandId,
+        commandLabel: t(`settings.commands.items.${commandId}.name`),
+        systemPrompt: cmd.prompt,
+        text,
+      }
+
+      openRightPanel()
+      if (rightPanelOpen && chatRef.current) {
+        void chatRef.current.startCommand(params)
+      } else {
+        setPendingCommand(params)
+      }
+    },
+    [voiceCommands, openRightPanel, rightPanelOpen, t],
+  )
 
   const beginResize = React.useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -370,6 +451,7 @@ export default function HistoryPage() {
                               size="sm"
                               className="h-5 shrink-0 px-1.5 text-[11px] font-normal text-muted-foreground hover:text-foreground"
                               title={t(tool.labelKey)}
+                              onClick={() => runHistoryTool(tool.id, item)}
                             >
                               {t(tool.labelKey)}
                             </Button>
@@ -433,14 +515,7 @@ export default function HistoryPage() {
             <div className="w-px bg-border/50 transition-colors group-hover:bg-border group-active:bg-primary/50" />
           </div>
           <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border/40 bg-secondary/10">
-            <div className="flex flex-1 flex-col items-center justify-center px-6 py-20 text-center text-muted-foreground">
-              <p className="text-sm font-medium text-foreground/70">
-                {t('history.placeholderTitle')}
-              </p>
-              <p className="mt-2 max-w-xs text-xs text-muted-foreground/60">
-                {t('history.placeholderDesc')}
-              </p>
-            </div>
+            <ChatPanel ref={chatRef} className="h-full" />
           </div>
         </>
       ) : null}

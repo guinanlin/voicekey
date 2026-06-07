@@ -1,6 +1,11 @@
 // 共享常量
 
-import type { AudioCapturePreferences, QwenCnIntlFlashModelId } from './types'
+import type {
+  AudioCapturePreferences,
+  QwenCnIntlFlashModelId,
+  TextLlmProvider,
+  TextLlmRegion,
+} from './types'
 
 // GLM ASR API 配置
 export const GLM_ASR = {
@@ -119,4 +124,48 @@ export function qwenTextGenerationUrl(region: QwenDashScopeRegion | undefined): 
 /** 百炼 OpenAI 兼容接口（默认文本 LLM 摘要等；地域需与 API Key 一致） */
 export function qwenCompatibleChatCompletionsUrl(region: QwenDashScopeRegion | undefined): string {
   return `${qwenDashScopeBase(region)}${DASHSCOPE.COMPATIBLE_CHAT_COMPLETIONS_PATH}`
+}
+
+/** 天翼云 Wishub 推理服务（OpenAI 兼容 chat/completions） */
+export const CTYUN = {
+  WISHUB_BASE: {
+    x1: 'https://wishub-x1.ctyun.cn',
+    x5: 'https://wishub-x5.ctyun.cn',
+    x6: 'https://wishub-x6.ctyun.cn',
+  },
+  CHAT_COMPLETIONS_PATH: '/v1/chat/completions',
+  DEFAULT_REGION: 'x1' as const,
+} as const
+
+export type CtyunWishubRegion = keyof typeof CTYUN.WISHUB_BASE
+
+export function ctyunChatCompletionsUrl(region: CtyunWishubRegion | undefined): string {
+  const r = region ?? CTYUN.DEFAULT_REGION
+  const base = CTYUN.WISHUB_BASE[r in CTYUN.WISHUB_BASE ? r : CTYUN.DEFAULT_REGION]
+  return `${base}${CTYUN.CHAT_COMPLETIONS_PATH}`
+}
+
+export function normalizeTextLlmProvider(raw: unknown): TextLlmProvider {
+  return raw === 'ctyun' ? 'ctyun' : 'aliyun'
+}
+
+export function normalizeTextLlmRegion(raw: unknown, provider: TextLlmProvider): TextLlmRegion {
+  if (provider === 'ctyun') {
+    if (raw === 'x5' || raw === 'x6') return raw
+    return CTYUN.DEFAULT_REGION
+  }
+  if (raw === 'intl' || raw === 'us') return raw
+  return 'cn'
+}
+
+export function textLlmDefaultGenerationUrl(
+  provider: TextLlmProvider,
+  region: TextLlmRegion,
+): string {
+  if (provider === 'ctyun') {
+    const r = region === 'x5' || region === 'x6' ? region : CTYUN.DEFAULT_REGION
+    return ctyunChatCompletionsUrl(r)
+  }
+  const r = region === 'intl' || region === 'us' ? region : 'cn'
+  return qwenCompatibleChatCompletionsUrl(r)
 }

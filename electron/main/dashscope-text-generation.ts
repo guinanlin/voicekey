@@ -1,6 +1,6 @@
 import axios from 'axios'
-import { DASHSCOPE, qwenCompatibleChatCompletionsUrl } from '../shared/constants'
-import type { TextLlmConfig } from '../shared/types'
+import { DASHSCOPE, textLlmDefaultGenerationUrl } from '../shared/constants'
+import type { TextLlmConfig, TextLlmProbeResult } from '../shared/types'
 
 const REQUEST_TIMEOUT_MS = 120_000
 const TEXT_LLM_PROBE_TIMEOUT_MS = 12_000
@@ -18,7 +18,8 @@ export function isLegacyDashScopeTextGenerationUrl(url: string): boolean {
 function resolveTextLlmRequestUrl(config: TextLlmConfig): string {
   const custom = config.generationUrl?.trim()
   if (custom) return custom
-  return qwenCompatibleChatCompletionsUrl(config.region)
+  const provider = config.provider ?? 'aliyun'
+  return textLlmDefaultGenerationUrl(provider, config.region)
 }
 
 function getOutput(data: unknown): Record<string, unknown> | null {
@@ -30,7 +31,10 @@ function getOutput(data: unknown): Record<string, unknown> | null {
 
 function formatDashScopeHttpError(status: number, data: unknown): string {
   if (data && typeof data === 'object') {
-    const errObj = (data as { error?: unknown }).error
+    const root = data as Record<string, unknown>
+    const detail = root.detail
+    if (typeof detail === 'string' && detail.trim()) return detail.trim()
+    const errObj = root.error
     if (errObj && typeof errObj === 'object') {
       const em = (errObj as { message?: unknown }).message
       if (typeof em === 'string' && em.trim()) return em.trim()
@@ -113,7 +117,8 @@ export async function generateTextWithTextLlm(
 
   const url = resolveTextLlmRequestUrl(config)
   const model = config.model?.trim() || DASHSCOPE.TEXT_LLM_DEFAULT_MODEL
-  const legacy = isLegacyDashScopeTextGenerationUrl(url)
+  const legacy =
+    (config.provider ?? 'aliyun') === 'aliyun' && isLegacyDashScopeTextGenerationUrl(url)
 
   const temperature = DASHSCOPE.TEXT_LLM_DEFAULT_TEMPERATURE
   const topP = DASHSCOPE.TEXT_LLM_DEFAULT_TOP_P
@@ -160,40 +165,51 @@ export async function generateTextWithTextLlm(
   }
 }
 
-export type TextLlmProbeCode = 'ok' | 'no_key' | 'auth' | 'endpoint' | 'network' | 'unknown'
-
 /**
- * 轻量探测 text LLM：POST 最小 body（缺 messages），期望 400 表示端点与 Key 基本可用。
+ * 轻量探测 text LLM。
+ * 阿里云：POST 仅含 model，400/200 表示端点与 Key 基本可用。
+ * 天翼云：须带 messages（与官方 curl 一致），200 表示成功。
  */
-export async function probeTextLlmConnection(config: TextLlmConfig): Promise<{
-  ok: boolean
-  code: TextLlmProbeCode
-  detail?: string
-}> {
+export async function probeTextLlmConnection(config: TextLlmConfig): Promise<TextLlmProbeResult> {
   const apiKey = config.apiKey?.trim()
   if (!apiKey) return { ok: false, code: 'no_key' }
 
+  const provider = config.provider ?? 'aliyun'
+  const model = config.model?.trim()
+  if (provider === 'ctyun' && !model) {
+    return { ok: false, code: 'no_model' }
+  }
+
   const url = resolveTextLlmRequestUrl(config)
-  const model = config.model?.trim() || DASHSCOPE.TEXT_LLM_DEFAULT_MODEL
-  const body = { model }
+  const resolvedModel = model || DASHSCOPE.TEXT_LLM_DEFAULT_MODEL
+  const body =
+    provider === 'ctyun'
+      ? {
+          model: resolvedModel,
+          messages: [{ role: 'user' as const, content: 'ping' }],
+          stream: false,
+        }
+      : { model: resolvedModel }
 
   try {
     const res = await axios.post(url, body, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
       },
       timeout: TEXT_LLM_PROBE_TIMEOUT_MS,
       validateStatus: () => true,
     })
     if (res.status === 401 || res.status === 403) return { ok: false, code: 'auth' }
-    if (res.status === 400 || res.status === 200) return { ok: true, code: 'ok' }
+    if (res.status === 200) return { ok: true, code: 'ok' }
+    if (provider === 'aliyun' && res.status === 400) return { ok: true, code: 'ok' }
     const msg = formatDashScopeHttpError(res.status, res.data)
     return { ok: false, code: 'endpoint', detail: msg }
   } catch (err) {
     if (axios.isAxiosError(err)) {
       if (err.code === 'ECONNABORTED') return { ok: false, code: 'network' }
-      if (err.response?.status === 400 || err.response?.status === 200) {
+      if (err.response?.status === 200) return { ok: true, code: 'ok' }
+      if (provider === 'aliyun' && err.response?.status === 400) {
         return { ok: true, code: 'ok' }
       }
       if (err.response?.status === 401 || err.response?.status === 403) {

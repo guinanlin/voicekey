@@ -10,6 +10,10 @@ import {
   FlashGenerateSummaryResult,
   DiagnosticsRunResult,
   SessionStartPayload,
+  TextLlmConfig,
+  TextLlmProbeResult,
+  CraftsmanChatPayload,
+  CraftsmanChatResult,
 } from '../shared/types'
 
 // 定义暴露给渲染进程的API接口
@@ -26,6 +30,8 @@ export interface ElectronAPI {
   getConfig: () => Promise<AppConfig>
   setConfig: (config: Partial<AppConfig>) => Promise<void>
   testConnection: (config?: ASRConfig) => Promise<boolean>
+  testTextLlmConnection: (config?: TextLlmConfig) => Promise<TextLlmProbeResult>
+  craftsmanChat: (payload: CraftsmanChatPayload) => Promise<CraftsmanChatResult>
   runDiagnostics: () => Promise<DiagnosticsRunResult>
 
   // 录音会话相关
@@ -107,6 +113,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getConfig: () => ipcRenderer.invoke(IPC_CHANNELS.CONFIG_GET),
   setConfig: (config: Partial<AppConfig>) => ipcRenderer.invoke(IPC_CHANNELS.CONFIG_SET, config),
   testConnection: (config?: ASRConfig) => ipcRenderer.invoke(IPC_CHANNELS.CONFIG_TEST, config),
+  testTextLlmConnection: (config?: TextLlmConfig) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CONFIG_TEST_TEXT_LLM, config),
+  craftsmanChat: (payload: CraftsmanChatPayload) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CRAFTSMAN_CHAT, payload),
   runDiagnostics: () => ipcRenderer.invoke(IPC_CHANNELS.DIAGNOSTICS_RUN),
 
   // 录音会话相关
