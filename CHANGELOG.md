@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.42](https://github.com/guinanlin/voicekey/compare/v0.2.41...v0.2.42) (2026-06-07)
+
+### Features
+
+- **craftsman:** connect history commands to multi-turn AI chat ([1085c24](https://github.com/guinanlin/voicekey/commit/1085c2456d5f7d7591b3970dc0652548628f028b))
+
 ### [0.2.41](https://github.com/guinanlin/voicekey/compare/v0.2.40...v0.2.41) (2026-06-05)
 
 ### Features
