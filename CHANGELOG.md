@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.44](https://github.com/guinanlin/voicekey/compare/v0.2.43...v0.2.44) (2026-06-14)
+
+### Features
+
+- **craftsman:** persist chat sessions and bracket voice commands ([b8fbf47](https://github.com/guinanlin/voicekey/commit/b8fbf47bbab929d28a28e977c0e0f3c9a32057bb))
+
 ### [0.2.43](https://github.com/guinanlin/voicekey/compare/v0.2.42...v0.2.43) (2026-06-07)
 
 ### [0.2.42](https://github.com/guinanlin/voicekey/compare/v0.2.41...v0.2.42) (2026-06-07)
