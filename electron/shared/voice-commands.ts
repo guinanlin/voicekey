@@ -144,6 +144,16 @@ export const DEFAULT_VOICE_COMMANDS: VoiceCommandItem[] = [
 
 const DEFAULT_BY_ID = new Map(DEFAULT_VOICE_COMMANDS.map((c) => [c.id, c]))
 
+/** 内置指令中文展示名（工匠页 / HTTP 历史关联会话） */
+export const VOICE_COMMAND_LABELS: Record<VoiceCommandId, string> = {
+  polish: '润色',
+  summary: '总结',
+  translate: '翻译',
+  wechat: '微信',
+  twitter: '推特',
+  email: '邮件',
+}
+
 export function getDefaultVoiceCommand(id: VoiceCommandId): VoiceCommandItem {
   const def = DEFAULT_BY_ID.get(id)
   if (!def) throw new Error(`Unknown voice command: ${id}`)
@@ -178,9 +188,40 @@ export interface ParsedVoiceCommand {
   trigger: string
 }
 
+/** 方括号标记 `[小猪佩奇:动作]` 中的动作名 → 内置指令 ID */
+const BRACKET_ACTION_TO_COMMAND_ID: Record<string, VoiceCommandId> = {
+  润色: 'polish',
+  总结: 'summary',
+  翻译: 'translate',
+  微信: 'wechat',
+  推特: 'twitter',
+  邮件: 'email',
+}
+
+const BRACKET_COMMAND_PATTERN = /\[小猪佩奇[:：]([^\]]+)\]\s*$/
+
+/** 识别末尾 `[小猪佩奇:微信]` 等方括号智能指令 */
+function parseBracketVoiceCommand(text: string): ParsedVoiceCommand | null {
+  const match = text.match(BRACKET_COMMAND_PATTERN)
+  if (!match || match.index === undefined) return null
+
+  const action = match[1].trim()
+  const commandId = BRACKET_ACTION_TO_COMMAND_ID[action]
+  if (!commandId) return null
+
+  const content = text.slice(0, match.index).trim()
+  if (!content) return null
+
+  return {
+    commandId,
+    content,
+    trigger: match[0].trim(),
+  }
+}
+
 /**
  * 从转写全文末尾识别触发词，剥离后返回正文与指令 ID。
- * 触发词须出现在文本末尾（允许其前有空白或换行）。
+ * 支持 `[小猪佩奇:微信]` 方括号标记，以及原有 `小猪佩奇微信` 后缀触发词（允许其前有空白或换行）。
  */
 export function parseVoiceCommandInput(
   rawText: string,
@@ -188,6 +229,9 @@ export function parseVoiceCommandInput(
 ): ParsedVoiceCommand | null {
   const text = rawText.trim()
   if (!text) return null
+
+  const bracket = parseBracketVoiceCommand(text)
+  if (bracket) return bracket
 
   const sorted = [...commands].sort((a, b) => b.trigger.length - a.trigger.length)
 

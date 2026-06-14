@@ -53,10 +53,12 @@ import {
   FlashChunkStatus,
   FlashGenerateSummaryPayload,
   FlashGenerateSummaryResult,
+  HistoryCraftsmanChatSavePayload,
   IPC_CHANNELS,
   OverlayState,
   RecorderLockOwner,
   TextLlmConfig,
+  VoiceCommandId,
   VoiceSession,
 } from '../shared/types'
 import { FlashNoteRepository } from './flash-note-repository'
@@ -1553,6 +1555,15 @@ function setupIPCHandlers() {
   ipcMain.handle(IPC_CHANNELS.HISTORY_GET, () => historyManager.getAll())
   ipcMain.handle(IPC_CHANNELS.HISTORY_CLEAR, () => historyManager.clear())
   ipcMain.handle(IPC_CHANNELS.HISTORY_DELETE, (_event, id) => historyManager.delete(id))
+  ipcMain.handle(
+    IPC_CHANNELS.HISTORY_GET_CRAFTSMAN_CHAT,
+    (_event, historyItemId: string, commandId: VoiceCommandId) =>
+      historyManager.getCraftsmanChat(historyItemId, commandId),
+  )
+  ipcMain.handle(
+    IPC_CHANNELS.HISTORY_SAVE_CRAFTSMAN_CHAT,
+    (_event, payload: HistoryCraftsmanChatSavePayload) => historyManager.saveCraftsmanChat(payload),
+  )
 
   // 接收音频数据
   ipcMain.on(IPC_CHANNELS.AUDIO_DATA, (_event, buffer) => {

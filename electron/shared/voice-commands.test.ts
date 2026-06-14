@@ -35,6 +35,34 @@ describe('parseVoiceCommandInput', () => {
   it('returns null when only trigger without content', () => {
     expect(parseVoiceCommandInput('小猪佩奇总结', commands)).toBeNull()
   })
+
+  it('strips bracket wechat command at end', () => {
+    const result = parseVoiceCommandInput('测试一下，用微信输入测试一下。[小猪佩奇:微信]', commands)
+    expect(result).toEqual({
+      commandId: 'wechat',
+      content: '测试一下，用微信输入测试一下。',
+      trigger: '[小猪佩奇:微信]',
+    })
+  })
+
+  it('strips bracket command with full-width colon', () => {
+    const result = parseVoiceCommandInput('正文内容[小猪佩奇：总结]', commands)
+    expect(result?.commandId).toBe('summary')
+    expect(result?.content).toBe('正文内容')
+    expect(result?.trigger).toBe('[小猪佩奇：总结]')
+  })
+
+  it('returns null when bracket command is not at end', () => {
+    expect(parseVoiceCommandInput('[小猪佩奇:微信]测试一下', commands)).toBeNull()
+  })
+
+  it('returns null when bracket action is unknown', () => {
+    expect(parseVoiceCommandInput('正文[小猪佩奇:未知]', commands)).toBeNull()
+  })
+
+  it('returns null when bracket has only trigger without content', () => {
+    expect(parseVoiceCommandInput('[小猪佩奇:微信]', commands)).toBeNull()
+  })
 })
 
 describe('normalizeVoiceCommandsConfig', () => {

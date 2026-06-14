@@ -149,6 +149,7 @@ export default function HistoryPage() {
       }
 
       const params: StartCommandParams = {
+        historyItemId: item.id,
         commandId,
         commandLabel: t(`settings.commands.items.${commandId}.name`),
         systemPrompt: cmd.prompt,

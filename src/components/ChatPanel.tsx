@@ -2,7 +2,11 @@ import * as React from 'react'
 import { Bot, Copy, Paperclip, Send, User, X, FileText, ImageIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import type { VoiceCommandId } from '@electron/shared/types'
+import type {
+  HistoryCraftsmanChatMessage,
+  HistoryCraftsmanChatSavePayload,
+  VoiceCommandId,
+} from '@electron/shared/types'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
@@ -25,6 +29,7 @@ export interface ChatMessage {
 }
 
 export interface StartCommandParams {
+  historyItemId: string
   commandId: VoiceCommandId
   commandLabel: string
   systemPrompt: string
@@ -37,6 +42,14 @@ export interface ChatPanelHandle {
 
 interface ChatPanelProps {
   className?: string
+}
+
+interface ActiveChatSession {
+  historyItemId: string
+  commandId: VoiceCommandId
+  commandLabel: string
+  systemPrompt: string
+  sourceText: string
 }
 
 function formatFileSize(bytes: number): string {
@@ -158,6 +171,26 @@ function toApiMessages(messages: ChatMessage[]): { role: 'user' | 'assistant'; c
   return messages.filter((m) => m.content.trim()).map((m) => ({ role: m.role, content: m.content }))
 }
 
+function toPersistedMessages(messages: ChatMessage[]): HistoryCraftsmanChatMessage[] {
+  return messages
+    .filter((m) => m.content.trim())
+    .map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp,
+    }))
+}
+
+function fromPersistedMessages(messages: HistoryCraftsmanChatMessage[]): ChatMessage[] {
+  return messages.map((m) => ({
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    timestamp: m.timestamp,
+  }))
+}
+
 export const ChatPanel = React.forwardRef<ChatPanelHandle, ChatPanelProps>(({ className }, ref) => {
   const { t } = useTranslation()
   const [messages, setMessages] = React.useState<ChatMessage[]>([])
@@ -166,6 +199,7 @@ export const ChatPanel = React.forwardRef<ChatPanelHandle, ChatPanelProps>(({ cl
   const [isLoading, setIsLoading] = React.useState(false)
   const [systemPrompt, setSystemPrompt] = React.useState<string | null>(null)
   const [activeCommandLabel, setActiveCommandLabel] = React.useState<string | null>(null)
+  const [activeSession, setActiveSession] = React.useState<ActiveChatSession | null>(null)
   const scrollRef = React.useRef<HTMLDivElement>(null)
   const bottomRef = React.useRef<HTMLDivElement>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -190,6 +224,7 @@ export const ChatPanel = React.forwardRef<ChatPanelHandle, ChatPanelProps>(({ cl
   const resetSession = React.useCallback(() => {
     setMessages([])
     setInput('')
+    setActiveSession(null)
     setPendingAttachments((prev) => {
       prev.forEach((att) => {
         if (att.previewUrl) URL.revokeObjectURL(att.previewUrl)
@@ -201,8 +236,27 @@ export const ChatPanel = React.forwardRef<ChatPanelHandle, ChatPanelProps>(({ cl
     }
   }, [])
 
+  const persistSession = React.useCallback(
+    async (session: ActiveChatSession, nextMessages: ChatMessage[]) => {
+      const api = window.electronAPI
+      if (!api?.saveHistoryCraftsmanChat) return
+
+      const payload: HistoryCraftsmanChatSavePayload = {
+        historyItemId: session.historyItemId,
+        commandId: session.commandId,
+        commandLabel: session.commandLabel,
+        systemPrompt: session.systemPrompt,
+        sourceText: session.sourceText,
+        messages: toPersistedMessages(nextMessages),
+      }
+
+      await api.saveHistoryCraftsmanChat(payload)
+    },
+    [],
+  )
+
   const requestModelReply = React.useCallback(
-    async (nextMessages: ChatMessage[], prompt: string) => {
+    async (nextMessages: ChatMessage[], prompt: string, session: ActiveChatSession | null) => {
       const api = window.electronAPI
       if (!api?.craftsmanChat) {
         toast.error(t('history.chat.noApiKey'))
@@ -231,7 +285,11 @@ export const ChatPanel = React.forwardRef<ChatPanelHandle, ChatPanelProps>(({ cl
           content: result.content ?? '',
           timestamp: Date.now(),
         }
-        setMessages((prev) => [...prev, assistantMessage])
+        const finalMessages = [...nextMessages, assistantMessage]
+        setMessages(finalMessages)
+        if (session) {
+          await persistSession(session, finalMessages)
+        }
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : t('history.chat.requestFailed')
         toast.error(errMsg)
@@ -239,7 +297,7 @@ export const ChatPanel = React.forwardRef<ChatPanelHandle, ChatPanelProps>(({ cl
         setIsLoading(false)
       }
     },
-    [t],
+    [persistSession, t],
   )
 
   const sendUserMessage = React.useCallback(
@@ -247,6 +305,10 @@ export const ChatPanel = React.forwardRef<ChatPanelHandle, ChatPanelProps>(({ cl
       const trimmed = content.trim()
       if (!trimmed && attachments.length === 0) return
       if (!systemPrompt?.trim()) {
+        toast.error(t('history.chat.noCommand'))
+        return
+      }
+      if (!activeSession) {
         toast.error(t('history.chat.noCommand'))
         return
       }
@@ -266,18 +328,42 @@ export const ChatPanel = React.forwardRef<ChatPanelHandle, ChatPanelProps>(({ cl
         textareaRef.current.style.height = 'auto'
       }
 
-      await requestModelReply(nextMessages, systemPrompt)
+      await persistSession(activeSession, nextMessages)
+      await requestModelReply(nextMessages, systemPrompt, activeSession)
     },
-    [messages, systemPrompt, requestModelReply, t],
+    [activeSession, messages, systemPrompt, persistSession, requestModelReply, t],
   )
 
   React.useImperativeHandle(
     ref,
     () => ({
-      startCommand: async ({ commandLabel, systemPrompt: prompt, text }: StartCommandParams) => {
+      startCommand: async ({
+        historyItemId,
+        commandId,
+        commandLabel,
+        systemPrompt: prompt,
+        text,
+      }: StartCommandParams) => {
         resetSession()
         setSystemPrompt(prompt)
         setActiveCommandLabel(commandLabel)
+        const session: ActiveChatSession = {
+          historyItemId,
+          commandId,
+          commandLabel,
+          systemPrompt: prompt,
+          sourceText: text.trim(),
+        }
+        setActiveSession(session)
+
+        const existing = await window.electronAPI?.getHistoryCraftsmanChat?.(
+          historyItemId,
+          commandId,
+        )
+        if (existing?.messages.length) {
+          setMessages(fromPersistedMessages(existing.messages))
+          return
+        }
 
         const userMessage: ChatMessage = {
           id: crypto.randomUUID(),
@@ -286,10 +372,11 @@ export const ChatPanel = React.forwardRef<ChatPanelHandle, ChatPanelProps>(({ cl
           timestamp: Date.now(),
         }
         setMessages([userMessage])
-        await requestModelReply([userMessage], prompt)
+        await persistSession(session, [userMessage])
+        await requestModelReply([userMessage], prompt, session)
       },
     }),
-    [resetSession, requestModelReply],
+    [persistSession, resetSession, requestModelReply],
   )
 
   const canSend =

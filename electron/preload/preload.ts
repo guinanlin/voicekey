@@ -14,6 +14,9 @@ import {
   TextLlmProbeResult,
   CraftsmanChatPayload,
   CraftsmanChatResult,
+  HistoryCraftsmanChatSavePayload,
+  HistoryCraftsmanChatSession,
+  VoiceCommandId,
 } from '../shared/types'
 
 // 定义暴露给渲染进程的API接口
@@ -43,6 +46,13 @@ export interface ElectronAPI {
   getHistory: () => Promise<HistoryItem[]>
   clearHistory: () => Promise<void>
   deleteHistoryItem: (id: string) => Promise<void>
+  getHistoryCraftsmanChat: (
+    historyItemId: string,
+    commandId: VoiceCommandId,
+  ) => Promise<HistoryCraftsmanChatSession | null>
+  saveHistoryCraftsmanChat: (
+    payload: HistoryCraftsmanChatSavePayload,
+  ) => Promise<HistoryCraftsmanChatSession | null>
   onHistoryChanged: (callback: () => void) => () => void
 
   // 闪记相关
@@ -128,6 +138,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getHistory: () => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_GET),
   clearHistory: () => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_CLEAR),
   deleteHistoryItem: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_DELETE, id),
+  getHistoryCraftsmanChat: (historyItemId: string, commandId: VoiceCommandId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.HISTORY_GET_CRAFTSMAN_CHAT, historyItemId, commandId),
+  saveHistoryCraftsmanChat: (payload: HistoryCraftsmanChatSavePayload) =>
+    ipcRenderer.invoke(IPC_CHANNELS.HISTORY_SAVE_CRAFTSMAN_CHAT, payload),
   onHistoryChanged: (callback: () => void) => {
     const listener = () => callback()
     ipcRenderer.on(IPC_CHANNELS.HISTORY_CHANGED, listener)

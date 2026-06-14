@@ -1,10 +1,13 @@
 import { BrowserWindow } from 'electron'
+import { randomUUID } from 'node:crypto'
 import Fastify from 'fastify'
 import swagger from '@fastify/swagger'
 import swaggerUI from '@fastify/swagger-ui'
 import cors from '@fastify/cors'
 import { IPC_CHANNELS } from '../shared/types'
+import { VOICE_COMMAND_LABELS } from '../shared/voice-commands'
 import { historyManager } from './history-manager'
+import { resolveTextForInjection } from './voice-command-runner'
 import { textInjector } from './text-injector'
 
 function broadcastHistoryChanged(): void {
@@ -102,7 +105,7 @@ function registerRoutes() {
         operationId: 'clipboardType',
         summary: 'POST /clipboard/type - 文本输入',
         description:
-          '文本输入接口。支持 mode: type（直接输入）或 clipboard（仅同步到剪贴板）；可选 after_key 在输入后按指定键。',
+          '文本输入接口。支持 mode: type（直接输入）或 clipboard（仅同步到剪贴板）；可选 after_key 在输入后按指定键。文本末尾含 `[小猪佩奇:微信]` 等智能指令时，会先调用文本大模型生成结果再输入。',
         tags: ['clipboard'],
         body: {
           type: 'object',
@@ -178,7 +181,10 @@ function registerRoutes() {
 
       try {
         const mode = body.mode || 'type'
-        const result = await textInjector.typeText(body.text, mode, body.after_key)
+        const resolved = await resolveTextForInjection(body.text)
+        const textToInject = resolved.text
+
+        const result = await textInjector.typeText(textToInject, mode, body.after_key)
 
         if (!result.success) {
           const statusCode = getHttpStatusCode(result.code)
@@ -186,13 +192,51 @@ function registerRoutes() {
           return result
         }
 
-        const trimmed = body.text?.trim() ?? ''
-        if (trimmed && (mode === 'type' || mode === 'clipboard')) {
-          historyManager.add({ text: trimmed })
+        const historyText = resolved.usedCommand
+          ? (resolved.sourceContent?.trim() ?? '')
+          : (body.text?.trim() ?? '')
+
+        if (historyText && (mode === 'type' || mode === 'clipboard')) {
+          const historyItem = historyManager.add({ text: historyText })
+
+          if (
+            resolved.usedCommand &&
+            resolved.commandId &&
+            resolved.sourceContent &&
+            resolved.systemPrompt
+          ) {
+            const now = Date.now()
+            historyManager.saveCraftsmanChat({
+              historyItemId: historyItem.id,
+              commandId: resolved.commandId,
+              commandLabel: VOICE_COMMAND_LABELS[resolved.commandId],
+              systemPrompt: resolved.systemPrompt,
+              sourceText: resolved.sourceContent,
+              messages: [
+                {
+                  id: randomUUID(),
+                  role: 'user',
+                  content: resolved.sourceContent,
+                  timestamp: now,
+                },
+                {
+                  id: randomUUID(),
+                  role: 'assistant',
+                  content: textToInject,
+                  timestamp: now + 1,
+                },
+              ],
+            })
+          }
+
           broadcastHistoryChanged()
         }
 
-        return result
+        return {
+          ...result,
+          usedCommand: resolved.usedCommand,
+          commandId: resolved.commandId,
+        }
       } catch (error) {
         console.error('[HTTP Server] /clipboard/type error:', error)
         reply.code(500)

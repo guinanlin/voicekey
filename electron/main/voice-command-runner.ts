@@ -1,4 +1,5 @@
 import { findVoiceCommandById, parseVoiceCommandInput } from '../shared/voice-commands'
+import type { VoiceCommandId } from '../shared/types'
 import { generateTextWithTextLlm } from './dashscope-text-generation'
 import { configManager } from './config-manager'
 import { t } from './i18n'
@@ -6,7 +7,9 @@ import { t } from './i18n'
 export interface ResolvedInjectionText {
   text: string
   usedCommand: boolean
-  commandId?: string
+  commandId?: VoiceCommandId
+  sourceContent?: string
+  systemPrompt?: string
 }
 
 /** 识别末尾触发词并可选调用文本模型；无指令时返回原文 */
@@ -36,5 +39,11 @@ export async function resolveTextForInjection(rawText: string): Promise<Resolved
     throw new Error(t('errors.commandFailed', { message: 'Empty model response' }))
   }
 
-  return { text, usedCommand: true, commandId: parsed.commandId }
+  return {
+    text,
+    usedCommand: true,
+    commandId: parsed.commandId,
+    sourceContent: parsed.content,
+    systemPrompt: cmd.prompt,
+  }
 }

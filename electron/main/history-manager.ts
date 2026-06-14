@@ -1,5 +1,10 @@
 import Store from 'electron-store'
-import { HistoryItem } from '../shared/types'
+import {
+  HistoryCraftsmanChatSavePayload,
+  HistoryCraftsmanChatSession,
+  HistoryItem,
+  VoiceCommandId,
+} from '../shared/types'
 
 interface HistorySchema {
   items: HistoryItem[]
@@ -51,6 +56,42 @@ export class HistoryManager {
 
     this.store.set('items', filteredItems)
     return true
+  }
+
+  getCraftsmanChat(
+    historyItemId: string,
+    commandId: VoiceCommandId,
+  ): HistoryCraftsmanChatSession | null {
+    const item = this.getAll().find((entry) => entry.id === historyItemId)
+    return item?.craftsmanChats?.[commandId] ?? null
+  }
+
+  saveCraftsmanChat(payload: HistoryCraftsmanChatSavePayload): HistoryCraftsmanChatSession | null {
+    const now = Date.now()
+    let saved: HistoryCraftsmanChatSession | null = null
+    const items = this.getAll().map((item) => {
+      if (item.id !== payload.historyItemId) return item
+
+      const existing = item.craftsmanChats?.[payload.commandId]
+      saved = {
+        ...payload,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      }
+
+      return {
+        ...item,
+        craftsmanChats: {
+          ...(item.craftsmanChats ?? {}),
+          [payload.commandId]: saved,
+        },
+      }
+    })
+
+    if (!saved) return null
+
+    this.store.set('items', items)
+    return saved
   }
 
   clear(): void {

@@ -42,7 +42,7 @@ shadcn/ui 组件库，基于 Radix UI 构建的可复用 UI 组件集合。包�
 
 ### `ChatPanel.tsx`
 
-工匠页右侧聊天组件：`ref.startCommand` 接收指令 Prompt + 历史文本并自动发起首条请求；多轮对话经 `craftsmanChat` IPC 调用文本模型（保留最近 10 轮上下文）；AI 回复气泡右下角可复制；附件仅 UI 展示；发送后自动滚底。
+工匠页右侧聊天组件：`ref.startCommand` 接收历史记录 ID、指令 Prompt 与历史文本；优先恢复该历史记录下对应指令的已保存会话，首次触发才自动发起首条请求；用户/AI 消息经历史 IPC 持久化，多轮对话经 `craftsmanChat` IPC 调用文本模型（保留最近 10 轮上下文）；AI 回复气泡右下角可复制；附件仅 UI 展示；发送后自动滚底。
 
 ### `CommandSettings.tsx`
 

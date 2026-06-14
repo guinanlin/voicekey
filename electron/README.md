@@ -24,7 +24,7 @@
 - `asr-provider.ts` - GLM ASR 服务封装
 - `text-injector.ts` - 文本注入模拟（基于 `nut-js`）
 - `config-manager.ts` - 配置持久化（基于 `electron-store`）
-- `history-manager.ts` - 转录历史存储（基于 `electron-store`）
+- `history-manager.ts` - 转录历史与关联工匠会话存储（基于 `electron-store`）
 
 ### `preload/`
 

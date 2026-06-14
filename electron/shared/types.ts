@@ -216,6 +216,7 @@ export interface HistoryItem {
   text: string
   timestamp: number
   duration?: number
+  craftsmanChats?: Partial<Record<VoiceCommandId, HistoryCraftsmanChatSession>>
 }
 
 export type UpdateStatus =
@@ -268,6 +269,29 @@ export interface CraftsmanChatMessage {
   content: string
 }
 
+/** 持久化在某条历史记录下的工匠聊天消息 */
+export interface HistoryCraftsmanChatMessage extends CraftsmanChatMessage {
+  id: string
+  timestamp: number
+}
+
+/** 单条历史记录 + 单个智能动作对应的一段工匠会话 */
+export interface HistoryCraftsmanChatSession {
+  historyItemId: string
+  commandId: VoiceCommandId
+  commandLabel: string
+  systemPrompt: string
+  sourceText: string
+  messages: HistoryCraftsmanChatMessage[]
+  createdAt: number
+  updatedAt: number
+}
+
+export type HistoryCraftsmanChatSavePayload = Omit<
+  HistoryCraftsmanChatSession,
+  'createdAt' | 'updatedAt'
+>
+
 export interface CraftsmanChatPayload {
   systemPrompt: string
   /** 不含 system；含当前待回复的 user 消息 */
@@ -315,6 +339,8 @@ export const IPC_CHANNELS = {
   HISTORY_CLEAR: 'history:clear',
   HISTORY_DELETE: 'history:delete',
   HISTORY_CHANGED: 'history:changed',
+  HISTORY_GET_CRAFTSMAN_CHAT: 'history:get-craftsman-chat',
+  HISTORY_SAVE_CRAFTSMAN_CHAT: 'history:save-craftsman-chat',
 
   // 工匠聊天
   CRAFTSMAN_CHAT: 'craftsman:chat',
